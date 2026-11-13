@@ -12,7 +12,7 @@ use rusqlite::{Connection, OptionalExtension as _, params};
 use crate::donnees::{self, Categorie, Rayon, Unite};
 
 /// Version du schéma, tenue dans `PRAGMA user_version`.
-const VERSION: i64 = 3;
+const VERSION: i64 = 4;
 
 /// Amène la base de la version `vers - 1` à la version `vers`.
 fn migrer(base: &Connection, vers: i64) -> Result<(), Erreur> {
@@ -24,6 +24,8 @@ fn migrer(base: &Connection, vers: i64) -> Result<(), Erreur> {
         )?,
         // Deuxième lot de recettes du catalogue de départ.
         3 => ajouter_lot(base, donnees::LOT_2)?,
+        // Troisième lot : cuisines du monde, avec leurs ingrédients.
+        4 => ajouter_lot(base, donnees::LOT_3)?,
         _ => unreachable!("pas de migration vers la version {vers}"),
     }
     Ok(())
@@ -643,20 +645,20 @@ mod tests {
     }
 
     #[test]
-    fn le_lot_2_rejoint_une_base_existante() {
-        let dossier = std::env::temp_dir().join(format!("mijot-lot2-{}", std::process::id()));
+    fn les_lots_rejoignent_une_base_existante() {
+        let dossier = std::env::temp_dir().join(format!("mijot-lots-{}", std::process::id()));
         std::fs::create_dir_all(&dossier).unwrap();
         let chemin = dossier.join("v2.db");
         let _ = std::fs::remove_file(&chemin);
         let lot: Vec<&donnees::Recette> = donnees::RECETTES
             .iter()
-            .filter(|r| donnees::LOT_2.contains(&r.id))
+            .filter(|r| donnees::LOT_2.contains(&r.id) || donnees::LOT_3.contains(&r.id))
             .collect();
         let premier_lot = donnees::RECETTES.len() - lot.len();
         // Recette du lot que l'utilisateur aurait déjà créée, à sa façon.
         let deja = lot[0].nom;
         {
-            // Base de la version 2, sans le lot, et qui a vécu : un prix modifié,
+            // Base de la version 2, sans les lots, et qui a vécu : un prix modifié,
             // une recette supprimée avec un de ses ingrédients, une recette maison.
             let mut base = Connection::open(&chemin).unwrap();
             base.pragma_update(None, "foreign_keys", true).unwrap();
@@ -668,6 +670,13 @@ mod tests {
                 tx.execute("DELETE FROM recette WHERE nom = ?1", params![r.nom])
                     .unwrap();
             }
+            // Les ingrédients arrivés avec les lots n'y sont pas non plus.
+            tx.execute(
+                "DELETE FROM ingredient WHERE id NOT IN
+                     (SELECT ingredient_id FROM recette_ingredient)",
+                [],
+            )
+            .unwrap();
             tx.execute(
                 "UPDATE ingredient SET prix = 7.77 WHERE nom = 'Courgettes'",
                 [],
@@ -692,7 +701,7 @@ mod tests {
 
         let cat = Catalogue::ouvrir(&chemin).unwrap();
         // Le premier lot sans la pizza (une recette supprimée ne revient pas), la
-        // recette maison, et le lot moins la recette déjà présente sous ce nom.
+        // recette maison, et les lots moins la recette déjà présente sous ce nom.
         assert_eq!(cat.recettes.len(), (premier_lot - 1) + 1 + (lot.len() - 1));
         assert!(cat.recettes.iter().all(|r| !r.nom.starts_with("Pizza")));
         let maison = cat

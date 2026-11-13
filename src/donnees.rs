@@ -277,6 +277,14 @@ pub static INGREDIENTS: &[Ingredient] = &[
     // Boulangerie
     ing("pain", "Baguette", BO, Piece, 1.10),
     ing("pain_mie", "Pain de mie (tranches)", BO, Piece, 0.10),
+    // Ajoutés avec le troisième lot de recettes, en fin de liste comme dans
+    // une base migrée.
+    ing("beurre_cacahuete", "Beurre de cacahuète", EP, G, 8.0),
+    ing("cacahuetes", "Cacahuètes", EP, G, 7.0),
+    ing("ras_el_hanout", "Ras el-hanout", EP, G, 30.0),
+    ing("curcuma", "Curcuma", EP, G, 30.0),
+    ing("garam_masala", "Garam masala", EP, G, 35.0),
+    ing("petits_pois", "Petits pois (surgelés)", FR, G, 3.0),
 ];
 
 pub static RECETTES: &[Recette] = &[
@@ -1322,6 +1330,283 @@ pub static RECETTES: &[Recette] = &[
             "Préparer la semoule et servir avec les papillotes.",
         ],
     },
+    // Troisième lot (voir `LOT_3`) : cuisines du monde.
+    Recette {
+        id: "mafe_poulet",
+        nom: "Mafé de poulet et riz",
+        categorie: Categorie::Mijote,
+        vege: false,
+        minutes: 45,
+        ingredients: &[
+            ("poulet", 110.),
+            ("beurre_cacahuete", 35.),
+            ("tomates_concassees", 80.),
+            ("oignon", 50.),
+            ("carotte", 80.),
+            ("bouillon", 0.5),
+            ("riz", 70.),
+        ],
+        etapes: &[
+            "Faire dorer le poulet en morceaux avec l'oignon émincé.",
+            "Ajouter les carottes en tronçons, les tomates et couvrir de bouillon.",
+            "Délayer le beurre de cacahuète dans une louche de bouillon chaud, le verser dans la cocotte et mijoter 30 minutes à feu doux en remuant de temps en temps.",
+            "Servir avec le riz.",
+        ],
+    },
+    Recette {
+        id: "poulet_yassa",
+        nom: "Poulet yassa et riz",
+        categorie: Categorie::Mijote,
+        vege: false,
+        minutes: 50,
+        ingredients: &[
+            ("cuisse_poulet", 220.),
+            ("oignon", 150.),
+            ("citron", 0.5),
+            ("moutarde", 10.),
+            ("ail", 0.5),
+            ("huile_olive", 8.),
+            ("riz", 70.),
+        ],
+        etapes: &[
+            "Mélanger le jus de citron, la moutarde et l'ail haché ; en enrober le poulet et les oignons émincés (la veille si possible).",
+            "Faire dorer le poulet à l'huile, puis le réserver.",
+            "Faire fondre les oignons 10 minutes dans la même cocotte, avec la marinade.",
+            "Remettre le poulet, ajouter un verre d'eau, couvrir et mijoter 30 minutes.",
+            "Servir avec le riz.",
+        ],
+    },
+    Recette {
+        id: "riz_jollof",
+        nom: "Riz jollof aux légumes",
+        categorie: Categorie::Riz,
+        vege: true,
+        minutes: 40,
+        ingredients: &[
+            ("riz", 80.),
+            ("tomates_concassees", 100.),
+            ("poivron", 60.),
+            ("oignon", 50.),
+            ("carotte", 60.),
+            ("ail", 0.5),
+            ("paprika", 2.),
+            ("bouillon", 0.5),
+            ("huile_olive", 8.),
+        ],
+        etapes: &[
+            "Faire revenir l'oignon, l'ail, le poivron et les carottes en dés avec le paprika.",
+            "Ajouter les tomates et laisser réduire 10 minutes.",
+            "Ajouter le riz rincé et le bouillon (une fois et demie le volume du riz), couvrir et cuire 20 minutes à feu très doux sans remuer.",
+            "Laisser reposer 5 minutes à couvert, puis égrainer à la fourchette.",
+        ],
+    },
+    Recette {
+        id: "tajine_poulet",
+        nom: "Tajine de poulet aux carottes et pois chiches",
+        categorie: Categorie::Mijote,
+        vege: false,
+        minutes: 50,
+        ingredients: &[
+            ("cuisse_poulet", 220.),
+            ("carotte", 120.),
+            ("pois_chiches", 60.),
+            ("oignon", 50.),
+            ("citron", 0.25),
+            ("ras_el_hanout", 3.),
+            ("huile_olive", 8.),
+            ("semoule", 60.),
+        ],
+        etapes: &[
+            "Faire dorer le poulet à l'huile avec l'oignon émincé et le ras el-hanout.",
+            "Ajouter les carottes en bâtonnets, des rondelles de citron et un verre d'eau ; couvrir et mijoter 30 minutes.",
+            "Ajouter les pois chiches égouttés et cuire encore 10 minutes.",
+            "Préparer la semoule et servir avec le tajine.",
+        ],
+    },
+    Recette {
+        id: "harira",
+        nom: "Harira aux lentilles et pois chiches",
+        categorie: Categorie::Soupe,
+        vege: true,
+        minutes: 45,
+        ingredients: &[
+            ("lentilles_vertes", 50.),
+            ("pois_chiches", 60.),
+            ("tomates_concassees", 120.),
+            ("oignon", 50.),
+            ("carotte", 50.),
+            ("ras_el_hanout", 3.),
+            ("bouillon", 0.5),
+            ("citron", 0.25),
+            ("pain", 0.25),
+        ],
+        etapes: &[
+            "Faire revenir l'oignon et les carottes en petits dés avec le ras el-hanout.",
+            "Ajouter les lentilles, les tomates et le bouillon ; cuire 30 minutes.",
+            "Ajouter les pois chiches égouttés et cuire encore 5 minutes.",
+            "Servir avec un filet de jus de citron et du pain.",
+        ],
+    },
+    Recette {
+        id: "aloo_gobi",
+        nom: "Aloo gobi (pommes de terre et chou-fleur aux épices)",
+        categorie: Categorie::Mijote,
+        vege: true,
+        minutes: 35,
+        ingredients: &[
+            ("pomme_de_terre", 200.),
+            ("chou_fleur", 180.),
+            ("oignon", 40.),
+            ("tomate", 80.),
+            ("ail", 0.5),
+            ("curcuma", 2.),
+            ("cumin", 2.),
+            ("huile_olive", 10.),
+            ("riz", 60.),
+        ],
+        etapes: &[
+            "Faire revenir l'oignon et l'ail à l'huile avec le curcuma et le cumin.",
+            "Ajouter les pommes de terre en dés et le chou-fleur en petits bouquets, bien enrober d'épices.",
+            "Ajouter les tomates en dés et un demi-verre d'eau, couvrir et cuire 20 minutes à feu doux.",
+            "Servir avec le riz.",
+        ],
+    },
+    Recette {
+        id: "tikka_masala",
+        nom: "Poulet tikka masala et riz",
+        categorie: Categorie::Mijote,
+        vege: false,
+        minutes: 40,
+        ingredients: &[
+            ("poulet", 120.),
+            ("yaourt", 0.5),
+            ("tomates_concassees", 100.),
+            ("creme", 40.),
+            ("oignon", 40.),
+            ("ail", 0.5),
+            ("garam_masala", 3.),
+            ("riz", 70.),
+        ],
+        etapes: &[
+            "Mélanger le poulet en morceaux avec le yaourt et la moitié du garam masala ; laisser mariner 15 minutes.",
+            "Faire dorer le poulet à feu vif, puis le réserver.",
+            "Faire revenir l'oignon et l'ail avec le reste des épices, ajouter les tomates et mijoter 10 minutes.",
+            "Ajouter la crème et le poulet, cuire encore 10 minutes.",
+            "Servir avec le riz.",
+        ],
+    },
+    Recette {
+        id: "rajma",
+        nom: "Rajma (haricots rouges à l'indienne) et riz",
+        categorie: Categorie::Mijote,
+        vege: true,
+        minutes: 30,
+        ingredients: &[
+            ("haricots_rouges", 130.),
+            ("tomates_concassees", 100.),
+            ("oignon", 50.),
+            ("ail", 0.5),
+            ("garam_masala", 3.),
+            ("huile_olive", 8.),
+            ("riz", 70.),
+        ],
+        etapes: &[
+            "Faire revenir l'oignon et l'ail à l'huile avec le garam masala.",
+            "Ajouter les tomates et cuire 10 minutes.",
+            "Ajouter les haricots égouttés et un demi-verre d'eau ; mijoter 15 minutes en écrasant quelques haricots pour lier la sauce.",
+            "Servir avec le riz.",
+        ],
+    },
+    Recette {
+        id: "riz_cantonais",
+        nom: "Riz cantonais",
+        categorie: Categorie::Riz,
+        vege: false,
+        minutes: 20,
+        ingredients: &[
+            ("riz", 80.),
+            ("oeuf", 1.),
+            ("jambon", 1.),
+            ("petits_pois", 60.),
+            ("oignon", 30.),
+            ("sauce_soja", 10.),
+            ("huile_olive", 8.),
+        ],
+        etapes: &[
+            "Cuire le riz, l'égoutter et le laisser refroidir (l'idéal : un reste de la veille).",
+            "Cuire les œufs battus en omelette fine, puis la couper en lanières.",
+            "Faire revenir l'oignon, les petits pois et le jambon en dés.",
+            "Ajouter le riz et le faire sauter 5 minutes à feu vif ; finir avec l'omelette et la sauce soja.",
+        ],
+    },
+    Recette {
+        id: "oyakodon",
+        nom: "Oyakodon (poulet et œufs sur riz)",
+        categorie: Categorie::Riz,
+        vege: false,
+        minutes: 25,
+        ingredients: &[
+            ("poulet", 100.),
+            ("oeuf", 1.5),
+            ("oignon", 60.),
+            ("sauce_soja", 20.),
+            ("bouillon", 0.25),
+            ("riz", 80.),
+        ],
+        etapes: &[
+            "Cuire le riz.",
+            "Dans une poêle, faire frémir un fond de bouillon avec la sauce soja et l'oignon émincé pendant 5 minutes.",
+            "Ajouter le poulet en fines lamelles et cuire 8 minutes.",
+            "Verser les œufs à peine battus, couvrir et cuire 2 minutes : ils doivent rester moelleux.",
+            "Faire glisser sur le riz.",
+        ],
+    },
+    Recette {
+        id: "nouilles_poulet_cacahuetes",
+        nom: "Nouilles sautées au poulet et aux cacahuètes",
+        categorie: Categorie::Express,
+        vege: false,
+        minutes: 25,
+        ingredients: &[
+            ("nouilles", 80.),
+            ("poulet", 90.),
+            ("carotte", 60.),
+            ("poivron", 50.),
+            ("cacahuetes", 20.),
+            ("sauce_soja", 15.),
+            ("citron", 0.25),
+            ("ail", 0.5),
+            ("huile_olive", 8.),
+        ],
+        etapes: &[
+            "Cuire les nouilles, les égoutter.",
+            "Faire sauter le poulet en lamelles à feu vif avec l'ail.",
+            "Ajouter les carottes et le poivron en fines lanières, cuire 5 minutes : ils doivent rester croquants.",
+            "Ajouter les nouilles, la sauce soja et le jus de citron, mélanger 2 minutes.",
+            "Parsemer de cacahuètes concassées.",
+        ],
+    },
+    Recette {
+        id: "mjaddara",
+        nom: "Mjaddara (lentilles, riz et oignons confits)",
+        categorie: Categorie::Riz,
+        vege: true,
+        minutes: 40,
+        ingredients: &[
+            ("lentilles_vertes", 70.),
+            ("riz", 50.),
+            ("oignon", 150.),
+            ("cumin", 2.),
+            ("huile_olive", 15.),
+            ("yaourt", 1.),
+        ],
+        etapes: &[
+            "Cuire les lentilles 15 minutes à l'eau bouillante.",
+            "Pendant ce temps, faire confire les oignons émincés dans l'huile, 20 minutes à feu moyen, jusqu'à ce qu'ils soient bien bruns.",
+            "Ajouter aux lentilles le riz, le cumin et la moitié des oignons ; couvrir d'eau à hauteur et cuire 15 minutes à couvert.",
+            "Servir avec le reste des oignons sur le dessus et le yaourt.",
+        ],
+    },
 ];
 
 /// Recettes ajoutées au catalogue de départ après la première version. Une
@@ -1339,6 +1624,22 @@ pub static LOT_2: &[&str] = &[
     "wraps_thon",
     "aubergines_parmigiana",
     "colin_papillote",
+];
+
+/// Troisième lot, ajouté de la même façon : cuisines du monde.
+pub static LOT_3: &[&str] = &[
+    "mafe_poulet",
+    "poulet_yassa",
+    "riz_jollof",
+    "tajine_poulet",
+    "harira",
+    "aloo_gobi",
+    "tikka_masala",
+    "rajma",
+    "riz_cantonais",
+    "oyakodon",
+    "nouilles_poulet_cacahuetes",
+    "mjaddara",
 ];
 
 /// Position d'un ingrédient dans [`INGREDIENTS`].
@@ -1392,15 +1693,13 @@ mod tests {
     }
 
     #[test]
-    fn lot_2_dans_le_catalogue() {
-        for id in LOT_2 {
-            assert!(index_recette(id).is_some(), "{id} absente du catalogue");
-        }
-        // Le lot est la fin du catalogue : l'ordre d'une base neuve et celui
-        // d'une base migrée sont les mêmes.
-        let debut = RECETTES.len() - LOT_2.len();
+    fn lots_en_fin_de_catalogue() {
+        // Les lots sont la fin du catalogue, dans l'ordre de leurs migrations :
+        // l'ordre d'une base neuve et celui d'une base migrée sont les mêmes.
+        let lots: Vec<&str> = LOT_2.iter().chain(LOT_3).copied().collect();
+        let debut = RECETTES.len() - lots.len();
         let fin: Vec<&str> = RECETTES[debut..].iter().map(|r| r.id).collect();
-        assert_eq!(fin, LOT_2);
+        assert_eq!(fin, lots);
     }
 
     #[test]
