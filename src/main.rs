@@ -1,9 +1,12 @@
 //! Mijot : menus de la semaine à budget donné et liste de courses.
 //!
-//! Tout est local, dans le dossier de données de l'utilisateur : le catalogue
-//! (ingrédients, prix, recettes) dans une base SQLite, remplie au premier
-//! lancement et modifiable depuis l'application ; l'état (budget, menu, cases
-//! cochées) dans un fichier JSON.
+//! Les données sont locales, dans le dossier de données de l'utilisateur : le
+//! catalogue (ingrédients, prix, recettes) dans une base SQLite, remplie au
+//! premier lancement et modifiable depuis l'application ; l'état (budget, menu,
+//! cases cochées) dans un fichier JSON.
+//!
+//! Le réseau ne sert qu'à une chose, sur demande : suggérer un prix d'après
+//! Open Prices (voir `prix_ouverts.rs`).
 
 // Pas de fenêtre console sous Windows (sauf en debug).
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
@@ -12,6 +15,7 @@ mod catalogue;
 mod donnees;
 mod etat;
 mod plan;
+mod prix_ouverts;
 mod ui;
 
 use gpui_kit::assets::AllAssets;

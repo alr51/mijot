@@ -3,6 +3,7 @@
 
 mod prix;
 mod recettes;
+mod suggestion;
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::{
@@ -158,6 +159,8 @@ pub struct Mijot {
     /// Recette en cours de création ou de modification, dans le même volet.
     editeur: Option<recettes::Editeur>,
     prix: prix::Prix,
+    /// Suggestion de prix ouverte dans le volet de l'onglet des prix.
+    suggestion: Option<suggestion::Volet>,
     /// Dernier message : (succès, texte).
     avis: Option<(bool, String)>,
     rng: fastrand::Rng,
@@ -213,6 +216,7 @@ impl Mijot {
             detail: None,
             editeur: None,
             prix,
+            suggestion: None,
             avis: None,
             rng: fastrand::Rng::new(),
             _abonnements: abonnements,
@@ -910,11 +914,13 @@ impl Render for Mijot {
                 Alert::warning("avis", texte.clone())
             }
         });
-        // Le volet (recette ouverte ou en cours de modification) accompagne le
-        // menu et le catalogue de recettes, pas les listes.
-        let volet = matches!(self.onglet, Onglet::Menu | Onglet::Recettes)
-            .then(|| self.volet(cx))
-            .flatten();
+        // Volet de droite : la recette ouverte ou en cours de modification à côté
+        // du menu et des recettes, la suggestion de prix à côté des prix.
+        let volet = match self.onglet {
+            Onglet::Menu | Onglet::Recettes => self.volet(cx),
+            Onglet::Prix => self.volet_suggestion(cx),
+            Onglet::Courses => None,
+        };
         let theme = cx.theme();
         v_flex()
             .size_full()

@@ -12,8 +12,16 @@ use rusqlite::{Connection, params};
 use crate::donnees::{self, Categorie, Rayon, Unite};
 
 /// Version du schéma, tenue dans `PRAGMA user_version`.
-const VERSION: i64 = 1;
+const VERSION: i64 = 2;
 
+/// Passage de la version `n + 1` du schéma à la suivante, à partir de la 1.
+const MIGRATIONS: [&str; 1] = [
+    // 2 : catégorie Open Food Facts choisie pour suggérer un prix.
+    "ALTER TABLE ingredient ADD COLUMN off_tag TEXT;
+     ALTER TABLE ingredient ADD COLUMN off_nom TEXT;",
+];
+
+/// Schéma de la version 1 ; les versions suivantes sont dans [`MIGRATIONS`].
 const SCHEMA: &str = "
 CREATE TABLE ingredient (
     id    INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -52,6 +60,17 @@ pub struct Ingredient {
     pub unite: Unite,
     /// Prix en euros : au kilo, au litre ou à la pièce selon l'unité.
     pub prix: f64,
+    /// Catégorie Open Food Facts retenue pour les suggestions de prix.
+    pub off: Option<CategorieOff>,
+}
+
+/// Catégorie de la taxonomie Open Food Facts.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CategorieOff {
+    /// Identifiant canonique : `en:pastas`.
+    pub tag: String,
+    /// Nom affiché : « Pâtes alimentaires ».
+    pub nom: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -114,17 +133,24 @@ impl Catalogue {
 
     fn preparer(mut base: Connection) -> Result<Self, Erreur> {
         base.pragma_update(None, "foreign_keys", true)?;
-        let version: i64 = base.pragma_query_value(None, "user_version", |r| r.get(0))?;
-        if version == 0 {
-            let tx = base.transaction()?;
-            tx.execute_batch(SCHEMA)?;
-            remplir(&tx)?;
-            tx.pragma_update(None, "user_version", VERSION)?;
-            tx.commit()?;
-        } else if version > VERSION {
+        let mut version: i64 = base.pragma_query_value(None, "user_version", |r| r.get(0))?;
+        if version > VERSION {
             return invalide(format!(
                 "la base vient d'une version plus récente de Mijot (schéma {version})"
             ));
+        }
+        if version < VERSION {
+            let tx = base.transaction()?;
+            if version == 0 {
+                tx.execute_batch(SCHEMA)?;
+                remplir(&tx)?;
+                version = 1;
+            }
+            for migration in &MIGRATIONS[(version - 1) as usize..] {
+                tx.execute_batch(migration)?;
+            }
+            tx.pragma_update(None, "user_version", VERSION)?;
+            tx.commit()?;
         }
         let mut catalogue = Self {
             base,
@@ -138,7 +164,9 @@ impl Catalogue {
     fn recharger(&mut self) -> Result<(), Erreur> {
         let ingredients = self
             .base
-            .prepare("SELECT id, nom, rayon, unite, prix FROM ingredient ORDER BY id")?
+            .prepare(
+                "SELECT id, nom, rayon, unite, prix, off_tag, off_nom FROM ingredient ORDER BY id",
+            )?
             .query_map([], |r| {
                 Ok(Ingredient {
                     id: r.get(0)?,
@@ -147,6 +175,13 @@ impl Catalogue {
                     rayon: Rayon::depuis_code(&r.get::<_, String>(2)?).unwrap_or(Rayon::Epicerie),
                     unite: Unite::depuis_code(&r.get::<_, String>(3)?).unwrap_or(Unite::G),
                     prix: r.get(4)?,
+                    off: match (
+                        r.get::<_, Option<String>>(5)?,
+                        r.get::<_, Option<String>>(6)?,
+                    ) {
+                        (Some(tag), Some(nom)) => Some(CategorieOff { tag, nom }),
+                        _ => None,
+                    },
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -230,6 +265,23 @@ impl Catalogue {
         if modifies == 0 {
             return invalide("Cet ingrédient n'existe plus.");
         }
+        self.recharger()
+    }
+
+    /// Retient (ou oublie) la catégorie Open Food Facts d'un ingrédient.
+    pub fn definir_categorie_off(
+        &mut self,
+        ingredient: i64,
+        categorie: Option<&CategorieOff>,
+    ) -> Result<(), Erreur> {
+        self.base.execute(
+            "UPDATE ingredient SET off_tag = ?1, off_nom = ?2 WHERE id = ?3",
+            params![
+                categorie.map(|c| c.tag.as_str()),
+                categorie.map(|c| c.nom.as_str()),
+                ingredient
+            ],
+        )?;
         self.recharger()
     }
 
@@ -499,6 +551,44 @@ mod tests {
                 .all(|r| r.nom != donnees::RECETTES[0].nom)
         );
 
+        drop(cat);
+        std::fs::remove_dir_all(dossier).unwrap();
+    }
+
+    #[test]
+    fn une_base_de_la_version_1_est_migree_sans_perte() {
+        let dossier = std::env::temp_dir().join(format!("mijot-migration-{}", std::process::id()));
+        std::fs::create_dir_all(&dossier).unwrap();
+        let chemin = dossier.join("v1.db");
+        let _ = std::fs::remove_file(&chemin);
+        {
+            // Base telle que la version 1 l'écrivait, avec un prix modifié.
+            let mut base = Connection::open(&chemin).unwrap();
+            let tx = base.transaction().unwrap();
+            tx.execute_batch(SCHEMA).unwrap();
+            remplir(&tx).unwrap();
+            tx.execute("UPDATE ingredient SET prix = 7.77 WHERE id = 1", [])
+                .unwrap();
+            tx.pragma_update(None, "user_version", 1).unwrap();
+            tx.commit().unwrap();
+        }
+        let categorie = CategorieOff {
+            tag: "en:onions".into(),
+            nom: "Oignons".into(),
+        };
+        {
+            let mut cat = Catalogue::ouvrir(&chemin).unwrap();
+            assert_eq!(cat.ingredients.len(), donnees::INGREDIENTS.len());
+            assert_eq!(cat.recettes.len(), donnees::RECETTES.len());
+            assert_eq!(cat.ingredients[0].prix, 7.77);
+            assert_eq!(cat.ingredients[0].off, None);
+            cat.definir_categorie_off(1, Some(&categorie)).unwrap();
+        }
+        // Réouverture : pas de seconde migration, la catégorie est conservée puis oubliée.
+        let mut cat = Catalogue::ouvrir(&chemin).unwrap();
+        assert_eq!(cat.ingredients[0].off, Some(categorie));
+        cat.definir_categorie_off(1, None).unwrap();
+        assert_eq!(cat.ingredients[0].off, None);
         drop(cat);
         std::fs::remove_dir_all(dossier).unwrap();
     }

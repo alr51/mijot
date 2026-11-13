@@ -96,7 +96,20 @@ fn champ_prix(
 
 impl Mijot {
     /// Enregistre le prix dès qu'il est lisible ; une saisie en cours (« 2, ») est ignorée.
-    fn changer_prix(&mut self, ingredient: i64, texte: &str, cx: &mut Context<Self>) {
+    /// Écrit un prix dans le champ d'un ingrédient, comme une saisie.
+    pub(super) fn definir_champ_prix(
+        &mut self,
+        ingredient: i64,
+        texte: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some((champ, _)) = self.prix.champs.get(&ingredient) {
+            champ.update(cx, |s, cx| s.set_value(texte.to_owned(), window, cx));
+        }
+    }
+
+    pub(super) fn changer_prix(&mut self, ingredient: i64, texte: &str, cx: &mut Context<Self>) {
         let Some(prix) = lire_nombre(texte) else {
             return;
         };
@@ -162,6 +175,13 @@ impl Mijot {
         match self.cat.supprimer_ingredient(ingredient) {
             Ok(()) => {
                 self.prix.champs.remove(&ingredient);
+                if self
+                    .suggestion
+                    .as_ref()
+                    .is_some_and(|s| s.ingredient == ingredient)
+                {
+                    self.suggestion = None;
+                }
                 self.etat.elaguer(&self.cat);
                 self.rafraichir_editeur(window, cx);
                 self.avis = None;
@@ -240,7 +260,7 @@ impl Mijot {
             .gap_5()
             .child(
                 div().text_sm().text_color(discret).child(
-                    "Les prix servent à estimer le coût des recettes et de la liste de courses. Une modification est enregistrée dès la saisie.",
+                    "Les prix servent à estimer le coût des recettes et de la liste de courses. Une modification est enregistrée dès la saisie. « Suggérer » propose un prix d'après les relevés d'Open Prices.",
                 ),
             )
             .child(nouveau)
@@ -303,6 +323,17 @@ impl Mijot {
                         .py_1()
                         .child(div().flex_1().min_w_0().child(i.nom.clone()))
                         .child(usage)
+                        .child(
+                            Button::new(("suggerer-prix", position))
+                                .small()
+                                .ghost()
+                                .icon(IconName::Sparkles)
+                                .label("Suggérer")
+                                .tooltip("Suggérer un prix d'après Open Prices")
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    this.ouvrir_suggestion(id, window, cx)
+                                })),
+                        )
                         .children(
                             self.prix
                                 .champs
