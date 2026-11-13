@@ -12,7 +12,7 @@ use rusqlite::{Connection, OptionalExtension as _, params};
 use crate::donnees::{self, Categorie, Rayon, Unite};
 
 /// Version du schéma, tenue dans `PRAGMA user_version`.
-const VERSION: i64 = 4;
+const VERSION: i64 = 6;
 
 /// Amène la base de la version `vers - 1` à la version `vers`.
 fn migrer(base: &Connection, vers: i64) -> Result<(), Erreur> {
@@ -26,6 +26,19 @@ fn migrer(base: &Connection, vers: i64) -> Result<(), Erreur> {
         3 => ajouter_lot(base, donnees::LOT_2)?,
         // Troisième lot : cuisines du monde, avec leurs ingrédients.
         4 => ajouter_lot(base, donnees::LOT_3)?,
+        // Quatrième lot : tour du monde.
+        5 => ajouter_lot(base, donnees::LOT_4)?,
+        // Origine des recettes ; celles du catalogue de départ la reçoivent
+        // par leur nom.
+        6 => {
+            base.execute_batch("ALTER TABLE recette ADD COLUMN origine TEXT NOT NULL DEFAULT '';")?;
+            for r in donnees::RECETTES.iter().filter(|r| !r.origine.is_empty()) {
+                base.execute(
+                    "UPDATE recette SET origine = ?1 WHERE nom = ?2 COLLATE NOCASE",
+                    params![r.origine, r.nom],
+                )?;
+            }
+        }
         _ => unreachable!("pas de migration vers la version {vers}"),
     }
     Ok(())
@@ -92,6 +105,8 @@ pub struct Recette {
     pub vege: bool,
     /// Temps total (préparation et cuisson), en minutes.
     pub minutes: u32,
+    /// Pays ou région d'origine du plat ; vide si elle n'est pas renseignée.
+    pub origine: String,
     /// (identifiant d'ingrédient, quantité par personne dans l'unité de l'ingrédient).
     pub ingredients: Vec<(i64, f64)>,
     pub etapes: Vec<String>,
@@ -198,7 +213,7 @@ impl Catalogue {
 
         let mut recettes = self
             .base
-            .prepare("SELECT id, nom, categorie, vege, minutes FROM recette ORDER BY id")?
+            .prepare("SELECT id, nom, categorie, vege, minutes, origine FROM recette ORDER BY id")?
             .query_map([], |r| {
                 Ok(Recette {
                     id: r.get(0)?,
@@ -207,6 +222,7 @@ impl Catalogue {
                         .unwrap_or(Categorie::Express),
                     vege: r.get(3)?,
                     minutes: r.get(4)?,
+                    origine: r.get(5)?,
                     ingredients: Vec::new(),
                     etapes: Vec::new(),
                 })
@@ -374,19 +390,28 @@ impl Catalogue {
         let tx = self.base.transaction()?;
         let id = if recette.id == 0 {
             tx.execute(
-                "INSERT INTO recette (nom, categorie, vege, minutes) VALUES (?1, ?2, ?3, ?4)",
-                params![nom, recette.categorie.code(), recette.vege, recette.minutes],
-            )?;
-            tx.last_insert_rowid()
-        } else {
-            tx.execute(
-                "UPDATE recette SET nom = ?1, categorie = ?2, vege = ?3, minutes = ?4 WHERE id = ?5",
+                "INSERT INTO recette (nom, categorie, vege, minutes, origine)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
                 params![
                     nom,
                     recette.categorie.code(),
                     recette.vege,
                     recette.minutes,
-                    recette.id
+                    recette.origine.trim()
+                ],
+            )?;
+            tx.last_insert_rowid()
+        } else {
+            tx.execute(
+                "UPDATE recette SET nom = ?1, categorie = ?2, vege = ?3, minutes = ?4, origine = ?6
+                 WHERE id = ?5",
+                params![
+                    nom,
+                    recette.categorie.code(),
+                    recette.vege,
+                    recette.minutes,
+                    recette.id,
+                    recette.origine.trim()
                 ],
             )?;
             tx.execute(
@@ -513,6 +538,26 @@ fn inserer_recette(base: &Connection, r: &donnees::Recette) -> Result<(), Erreur
 mod tests {
     use super::*;
 
+    #[test]
+    fn les_recettes_de_depart_ont_leur_origine() {
+        let mut cat = Catalogue::en_memoire().unwrap();
+        for (lue, depart) in cat.recettes.iter().zip(donnees::RECETTES) {
+            assert_eq!(lue.origine, depart.origine, "{}", depart.id);
+        }
+        // L'origine saisie est enregistrée sans ses espaces, et se modifie.
+        let id = cat
+            .enregistrer_recette(&recette(
+                "Soupe du jour",
+                vec![(cat.ingredients[0].id, 50.)],
+            ))
+            .unwrap();
+        let mut lue = cat.recettes[cat.index_recette(id).unwrap()].clone();
+        assert_eq!(lue.origine, "Islande");
+        lue.origine.clear();
+        cat.enregistrer_recette(&lue).unwrap();
+        assert_eq!(cat.recettes[cat.index_recette(id).unwrap()].origine, "");
+    }
+
     fn recette(nom: &str, ingredients: Vec<(i64, f64)>) -> Recette {
         Recette {
             id: 0,
@@ -520,6 +565,7 @@ mod tests {
             categorie: Categorie::Express,
             vege: true,
             minutes: 10,
+            origine: "  Islande ".into(),
             ingredients,
             etapes: vec!["Mélanger.".into(), "  ".into(), " Servir. ".into()],
         }
@@ -652,7 +698,11 @@ mod tests {
         let _ = std::fs::remove_file(&chemin);
         let lot: Vec<&donnees::Recette> = donnees::RECETTES
             .iter()
-            .filter(|r| donnees::LOT_2.contains(&r.id) || donnees::LOT_3.contains(&r.id))
+            .filter(|r| {
+                [donnees::LOT_2, donnees::LOT_3, donnees::LOT_4]
+                    .iter()
+                    .any(|lot| lot.contains(&r.id))
+            })
             .collect();
         let premier_lot = donnees::RECETTES.len() - lot.len();
         // Recette du lot que l'utilisateur aurait déjà créée, à sa façon.

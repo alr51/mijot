@@ -31,6 +31,7 @@ pub(super) struct Editeur {
     id: Option<i64>,
     nom: Entity<InputState>,
     minutes: Entity<InputState>,
+    origine: Entity<InputState>,
     categorie: Entity<SelectState<Liste<Categorie>>>,
     vege: bool,
     /// (identifiant d'ingrédient, champ de quantité par personne).
@@ -97,6 +98,15 @@ impl Mijot {
             window,
             cx,
         );
+        let origine = champ(
+            existante
+                .as_ref()
+                .map(|r| r.origine.clone())
+                .unwrap_or_default(),
+            "Pays ou région (facultatif)",
+            window,
+            cx,
+        );
         let categorie = selecteur(
             liste(Categorie::TOUTES.map(|c| (c.nom().to_owned(), c))),
             Some(
@@ -135,6 +145,7 @@ impl Mijot {
             id: existante.as_ref().map(|r| r.id),
             nom,
             minutes,
+            origine,
             categorie,
             vege: existante.as_ref().is_some_and(|r| r.vege),
             lignes: Vec::new(),
@@ -221,6 +232,7 @@ impl Mijot {
                 .unwrap_or(Categorie::Express),
             vege: editeur.vege,
             minutes,
+            origine: editeur.origine.read(cx).value().to_string(),
             ingredients,
             etapes: editeur
                 .etapes
@@ -300,6 +312,7 @@ impl Mijot {
                 aiguille.is_empty()
                     || recette.nom.to_lowercase().contains(&aiguille)
                     || recette.categorie.nom().to_lowercase().contains(&aiguille)
+                    || recette.origine.to_lowercase().contains(&aiguille)
                     || recette.ingredients.iter().any(|(id, _)| {
                         self.cat.index_ingredient(*id).is_some_and(|i| {
                             self.cat.ingredients[i]
@@ -316,7 +329,7 @@ impl Mijot {
             lignes = lignes.child(etat_vide(
                 IconName::Search,
                 "Aucune recette ne correspond",
-                "Essaie un autre mot : un nom de plat, une catégorie ou un ingrédient.",
+                "Essaie un autre mot : un nom de plat, une catégorie, un pays ou un ingrédient.",
                 cx,
             ));
         }
@@ -472,7 +485,11 @@ impl Mijot {
             .child(entete_volet(
                 pastille(icone, teinte, 48., cx),
                 r.nom.clone(),
-                r.categorie.nom(),
+                if r.origine.is_empty() {
+                    r.categorie.nom().to_owned()
+                } else {
+                    format!("{} · {}", r.categorie.nom(), r.origine)
+                },
                 Button::new("fermer-volet")
                     .small()
                     .ghost()
@@ -709,6 +726,12 @@ impl Mijot {
                                     .child(titre_section("Temps (min)", cx))
                                     .child(Input::new(&editeur.minutes)),
                             ),
+                    )
+                    .child(
+                        v_flex()
+                            .gap_1()
+                            .child(titre_section("Origine", cx))
+                            .child(Input::new(&editeur.origine)),
                     )
                     .child(
                         Switch::new("recette-vege")

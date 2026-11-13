@@ -571,6 +571,9 @@ impl Mijot {
             .gap_1()
             .flex_wrap()
             .child(Tag::secondary().small().child(r.categorie.nom()))
+            .when(!r.origine.is_empty(), |row| {
+                row.child(Tag::primary().small().outline().child(r.origine.clone()))
+            })
             .when(r.vege, |row| {
                 row.child(Tag::success().small().child("Végétarien"))
             })

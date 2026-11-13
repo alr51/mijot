@@ -196,11 +196,26 @@ impl Mijot {
                             .flex_1()
                             .min_w_0()
                             .child(
-                                div()
+                                // Le jour, puis l'origine du plat si elle est connue.
+                                h_flex()
+                                    .gap_1()
                                     .text_xs()
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .text_color(primaire)
-                                    .child(libelle_repas(position, total)),
+                                    .child(
+                                        div()
+                                            .flex_shrink_0()
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .text_color(primaire)
+                                            .child(libelle_repas(position, total)),
+                                    )
+                                    .when(!r.origine.is_empty(), |ligne| {
+                                        ligne.child(
+                                            div()
+                                                .min_w_0()
+                                                .truncate()
+                                                .text_color(discret)
+                                                .child(format!("· {}", r.origine)),
+                                        )
+                                    }),
                             )
                             .child(
                                 div()
