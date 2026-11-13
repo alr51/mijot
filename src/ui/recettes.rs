@@ -16,7 +16,10 @@ use gpui_kit::component::{
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use super::style::{entete, etat_vide, pastille, visuel_categorie};
+use super::style::{
+    carte, entete, entete_volet, etat_vide, numero, pastille, titre_section, tuile,
+    visuel_categorie, volet,
+};
 use super::{Liste, Mijot, ecrire_nombre, lire_nombre, liste, quantite_recette, selecteur};
 use crate::catalogue::{Catalogue, Recette};
 use crate::donnees::Categorie;
@@ -415,16 +418,21 @@ impl Mijot {
     }
 
     fn volet_lecture(&self, recette: usize, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.theme();
-        let (discret, bordure) = (theme.muted_foreground, theme.border);
+        let bordure = cx.theme().border;
         let r = &self.cat.recettes[recette];
         let id = r.id;
+        let (icone, teinte) = visuel_categorie(r.categorie);
         let personnes = self.etat.personnes;
+        let pour = match personnes {
+            1 => "Pour 1 personne".to_owned(),
+            n => format!("Pour {n} personnes"),
+        };
         let par_personne = cout_par_personne(&self.cat, recette);
         let au_menu = self.etat.menu.contains(&id);
         let menu_plein = self.etat.menu.len() >= REPAS_MAX;
 
-        let mut ingredients = v_flex().gap_1();
+        let mut ingredients = carte(cx).py_2();
+        let mut premier = true;
         for (ingredient, quantite) in &r.ingredients {
             let Some(i) = self.cat.index_ingredient(*ingredient) else {
                 continue;
@@ -434,103 +442,88 @@ impl Mijot {
                 h_flex()
                     .justify_between()
                     .gap_3()
+                    .py_1p5()
                     .text_sm()
-                    .child(div().child(i.nom.clone()))
+                    .when(!premier, |ligne| ligne.border_t_1().border_color(bordure))
+                    .child(div().flex_1().min_w_0().child(i.nom.clone()))
                     .child(
                         div()
                             .flex_shrink_0()
-                            .text_color(discret)
+                            .font_weight(FontWeight::MEDIUM)
                             .child(quantite_recette(quantite * f64::from(personnes), i.unite)),
                     ),
             );
+            premier = false;
         }
 
-        let mut etapes = v_flex().gap_3();
+        let mut etapes = carte(cx).gap_3();
         for (n, etape) in r.etapes.iter().enumerate() {
             etapes = etapes.child(
                 div()
                     .flex()
-                    .gap_2()
+                    .gap_3()
                     .text_sm()
-                    .child(
-                        div()
-                            .flex_shrink_0()
-                            .w(px(18.))
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(discret)
-                            .child(format!("{}.", n + 1)),
-                    )
+                    .child(numero(n + 1, cx))
                     .child(div().flex_1().min_w_0().child(etape.clone())),
             );
         }
 
-        let titre = |texte: String| {
-            div()
-                .text_sm()
-                .font_weight(FontWeight::SEMIBOLD)
-                .child(texte)
-        };
-
-        v_flex()
-            .id("volet")
-            .w(px(380.))
-            .flex_shrink_0()
-            .overflow_y_scroll()
-            .border_l_1()
-            .border_color(bordure)
-            .p_5()
-            .gap_4()
+        volet("volet", 400., cx)
+            .child(entete_volet(
+                pastille(icone, teinte, 48., cx),
+                r.nom.clone(),
+                r.categorie.nom(),
+                Button::new("fermer-volet")
+                    .small()
+                    .ghost()
+                    .icon(IconName::X)
+                    .tooltip("Fermer")
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.detail = None;
+                        cx.notify();
+                    })),
+                cx,
+            ))
+            .when(r.vege || au_menu, |volet| {
+                volet.child(
+                    h_flex()
+                        .gap_2()
+                        .flex_wrap()
+                        .when(au_menu, |ligne| {
+                            ligne.child(Tag::primary().child("Au menu cette semaine"))
+                        })
+                        .when(r.vege, |ligne| {
+                            ligne.child(Tag::success().child("Végétarien"))
+                        }),
+                )
+            })
             .child(
-                div()
-                    .flex()
-                    .justify_between()
+                h_flex()
                     .gap_2()
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .text_lg()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child(r.nom.clone()),
-                    )
-                    .child(
-                        Button::new("fermer-volet")
-                            .small()
-                            .ghost()
-                            .icon(IconName::X)
-                            .tooltip("Fermer")
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.detail = None;
-                                cx.notify();
-                            })),
-                    ),
+                    .items_stretch()
+                    .child(tuile(
+                        format!("Pour {personnes}"),
+                        format!("≈ {}", euros(par_personne * f64::from(personnes))),
+                        cx,
+                    ))
+                    .child(tuile("Par personne", euros(par_personne), cx))
+                    .child(tuile("Temps", format!("{} min", r.minutes), cx)),
             )
-            .child(self.etiquettes(recette))
-            .child(div().text_sm().text_color(discret).child(format!(
-                "≈ {} pour {personnes} · {} par personne",
-                euros(par_personne * f64::from(personnes)),
-                euros(par_personne)
-            )))
             .child(
                 h_flex()
                     .gap_2()
                     .flex_wrap()
-                    .child(if au_menu {
-                        Tag::primary()
-                            .child("Au menu cette semaine")
-                            .into_any_element()
-                    } else {
-                        Button::new("ajouter-au-menu")
-                            .outline()
-                            .icon(IconName::Plus)
-                            .label("Ajouter au menu")
-                            .disabled(menu_plein)
-                            .on_click(
-                                cx.listener(move |this, _, _, cx| {
+                    .when(!au_menu, |ligne| {
+                        ligne.child(
+                            Button::new("ajouter-au-menu")
+                                .primary()
+                                .icon(IconName::Plus)
+                                .label("Ajouter au menu")
+                                .disabled(menu_plein)
+                                .on_click(cx.listener(move |this, _, _, cx| {
                                     this.ajouter_au_menu(recette, cx)
-                                }),
-                            )
-                            .into_any_element()
+                                })),
+                        )
                     })
                     .child(
                         Button::new("modifier-recette")
@@ -542,17 +535,18 @@ impl Mijot {
                             })),
                     ),
             )
-            .child(titre(format!("Ingrédients pour {personnes}")))
+            .child(titre_section(
+                format!("Ingrédients · {}", pour.to_lowercase()),
+                cx,
+            ))
             .child(ingredients)
             .when(!r.etapes.is_empty(), |volet| {
-                volet.child(titre("Préparation".into())).child(etapes)
+                volet.child(titre_section("Préparation", cx)).child(etapes)
             })
     }
 
     fn volet_edition(&self, editeur: &Editeur, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.theme();
-        let (discret, bordure) = (theme.muted_foreground, theme.border);
-        let libelle = |texte: &'static str| div().text_sm().text_color(discret).child(texte);
+        let discret = cx.theme().muted_foreground;
 
         let mut lignes = v_flex().gap_2();
         for (position, (ingredient, champ)) in editeur.lignes.iter().enumerate() {
@@ -589,6 +583,14 @@ impl Mijot {
                     ),
             );
         }
+        if editeur.lignes.is_empty() {
+            lignes = lignes.child(
+                div()
+                    .text_sm()
+                    .text_color(discret)
+                    .child("Aucun ingrédient pour l'instant : choisis-en un ci-dessous."),
+            );
+        }
 
         let actions = if editeur.confirmer_suppression {
             h_flex()
@@ -622,6 +624,7 @@ impl Mijot {
                 .child(
                     Button::new("enregistrer-recette")
                         .primary()
+                        .icon(IconName::Check)
                         .label("Enregistrer")
                         .on_click(cx.listener(|this, _, _, cx| this.enregistrer_recette(cx))),
                 )
@@ -651,76 +654,113 @@ impl Mijot {
                 })
         };
 
-        v_flex()
-            .id("volet-edition")
-            .w(px(440.))
-            .flex_shrink_0()
-            .overflow_y_scroll()
-            .border_l_1()
-            .border_color(bordure)
-            .p_5()
-            .gap_3()
-            .child(
-                div()
-                    .text_lg()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child(if editeur.id.is_some() {
-                        "Modifier la recette"
-                    } else {
-                        "Nouvelle recette"
-                    }),
-            )
+        let (icone, titre) = if editeur.id.is_some() {
+            (IconName::Pencil, "Modifier la recette")
+        } else {
+            (IconName::Plus, "Nouvelle recette")
+        };
+
+        volet("volet-edition", 460., cx)
+            .child(entete_volet(
+                pastille(icone, 16., 48., cx),
+                titre,
+                "Rien n'est enregistré avant « Enregistrer ».",
+                Button::new("fermer-editeur")
+                    .small()
+                    .ghost()
+                    .icon(IconName::X)
+                    .tooltip("Annuler")
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.editeur = None;
+                        cx.notify();
+                    })),
+                cx,
+            ))
             .children(
                 editeur
                     .erreur
                     .as_ref()
                     .map(|erreur| Alert::error("erreur-recette", erreur.clone())),
             )
-            .child(libelle("Nom"))
-            .child(Input::new(&editeur.nom))
             .child(
-                h_flex()
+                carte(cx)
                     .gap_3()
-                    .items_end()
                     .child(
                         v_flex()
-                            .flex_1()
                             .gap_1()
-                            .child(libelle("Catégorie"))
-                            .child(Select::new(&editeur.categorie)),
+                            .child(titre_section("Nom", cx))
+                            .child(Input::new(&editeur.nom)),
                     )
                     .child(
-                        v_flex()
-                            .w(px(110.))
-                            .gap_1()
-                            .child(libelle("Temps (min)"))
-                            .child(Input::new(&editeur.minutes)),
+                        h_flex()
+                            .gap_3()
+                            .items_end()
+                            .child(
+                                v_flex()
+                                    .flex_1()
+                                    .gap_1()
+                                    .child(titre_section("Catégorie", cx))
+                                    .child(Select::new(&editeur.categorie)),
+                            )
+                            .child(
+                                v_flex()
+                                    .w(px(110.))
+                                    .gap_1()
+                                    .child(titre_section("Temps (min)", cx))
+                                    .child(Input::new(&editeur.minutes)),
+                            ),
+                    )
+                    .child(
+                        Switch::new("recette-vege")
+                            .checked(editeur.vege)
+                            .label("Végétarienne")
+                            .on_click(cx.listener(|this, on: &bool, _, cx| {
+                                if let Some(editeur) = &mut this.editeur {
+                                    editeur.vege = *on;
+                                    cx.notify();
+                                }
+                            })),
                     ),
             )
             .child(
-                Switch::new("recette-vege")
-                    .checked(editeur.vege)
-                    .label("Végétarienne")
-                    .on_click(cx.listener(|this, on: &bool, _, cx| {
-                        if let Some(editeur) = &mut this.editeur {
-                            editeur.vege = *on;
-                            cx.notify();
-                        }
-                    })),
+                carte(cx)
+                    .gap_3()
+                    .child(
+                        v_flex()
+                            .child(
+                                div()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .child("Ingrédients"),
+                            )
+                            .child(titre_section("Quantité par personne", cx)),
+                    )
+                    .child(lignes)
+                    // Encadrée : seule dans la colonne, la liste s'étirerait en hauteur.
+                    .child(
+                        div().child(
+                            Select::new(&editeur.choix)
+                                .placeholder("Ajouter un ingrédient…")
+                                .search_placeholder("Chercher…"),
+                        ),
+                    )
+                    .child(div().text_xs().text_color(discret).child(
+                        "Il manque un ingrédient ? Crée-le dans « Ingrédients et prix », puis reviens ici : le formulaire reste ouvert.",
+                    )),
             )
-            .child(libelle("Ingrédients — quantité par personne"))
-            .child(lignes)
             .child(
-                // Encadrée : seule dans la colonne, la liste s'étirerait en hauteur.
- div().child(Select::new(&editeur.choix)
-                    .placeholder("Ajouter un ingrédient…")
-                    .search_placeholder("Chercher…")),
+                carte(cx)
+                    .gap_3()
+                    .child(
+                        v_flex()
+                            .child(
+                                div()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .child("Préparation"),
+                            )
+                            .child(titre_section("Une étape par ligne", cx)),
+                    )
+                    .child(Textarea::new(&editeur.etapes)),
             )
-            .child(div().text_xs().text_color(discret).child(
-                "Il manque un ingrédient ? Crée-le dans l'onglet « Ingrédients et prix », puis reviens ici : le formulaire reste ouvert.",
-            ))
-            .child(libelle("Préparation — une étape par ligne"))
-            .child(Textarea::new(&editeur.etapes))
-            .child(div().pt_2().child(actions))
+            .child(actions)
     }
 }

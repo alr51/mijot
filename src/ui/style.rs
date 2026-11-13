@@ -219,3 +219,91 @@ pub(super) fn etat_vide(
                 .child(texte.into()),
         )
 }
+
+/// Volet de droite : colonne défilante, sur le même fond que la barre latérale.
+pub(super) fn volet(id: &'static str, largeur: f32, cx: &App) -> Stateful<Div> {
+    let theme = cx.theme();
+    v_flex()
+        .id(id)
+        .w(px(largeur))
+        .flex_shrink_0()
+        .overflow_y_scroll()
+        .bg(theme.sidebar)
+        .border_l_1()
+        .border_color(theme.border)
+        .p_5()
+        .gap_4()
+}
+
+/// En-tête d'un volet : pastille, titre, précision, bouton de fermeture.
+pub(super) fn entete_volet(
+    pastille: Div,
+    titre: impl Into<SharedString>,
+    precision: impl Into<SharedString>,
+    fermer: impl IntoElement,
+    cx: &App,
+) -> Div {
+    div()
+        .flex()
+        .items_start()
+        .gap_3()
+        .child(pastille)
+        .child(
+            v_flex()
+                .flex_1()
+                .min_w_0()
+                .child(
+                    div()
+                        .text_lg()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .child(titre.into()),
+                )
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(cx.theme().muted_foreground)
+                        .child(precision.into()),
+                ),
+        )
+        .child(fermer)
+}
+
+/// Petit titre au-dessus d'une section ou d'un champ.
+pub(super) fn titre_section(texte: impl Into<SharedString>, cx: &App) -> Div {
+    div()
+        .text_xs()
+        .font_weight(FontWeight::SEMIBOLD)
+        .text_color(cx.theme().muted_foreground)
+        .child(texte.into())
+}
+
+/// Chiffre clé : un libellé discret au-dessus d'une valeur.
+pub(super) fn tuile(
+    libelle: impl Into<SharedString>,
+    valeur: impl Into<SharedString>,
+    cx: &App,
+) -> Div {
+    carte(cx)
+        .flex_1()
+        .min_w_0()
+        .p_3()
+        .child(titre_section(libelle, cx))
+        .child(div().font_weight(FontWeight::SEMIBOLD).child(valeur.into()))
+}
+
+/// Numéro d'étape dans un rond teinté.
+pub(super) fn numero(n: usize, cx: &App) -> Div {
+    let primaire = cx.theme().primary;
+    div()
+        .flex()
+        .flex_shrink_0()
+        .items_center()
+        .justify_center()
+        .size(px(22.))
+        .rounded_full()
+        .bg(primaire.opacity(0.14))
+        .text_xs()
+        .font_weight(FontWeight::SEMIBOLD)
+        .text_color(primaire)
+        .child(n.to_string())
+}

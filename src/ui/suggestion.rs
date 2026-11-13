@@ -3,7 +3,7 @@
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::{
-    ActiveTheme as _, Sizable as _,
+    ActiveTheme as _, Icon, Sizable as _,
     alert::Alert,
     button::{Button, ButtonVariants as _},
     h_flex,
@@ -13,6 +13,7 @@ use gpui_kit::component::{
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
+use super::style::{carte, entete_volet, pastille, titre_section, visuel_rayon, volet};
 use super::{Mijot, ecrire_nombre};
 use crate::catalogue::CategorieOff;
 use crate::donnees::Unite;
@@ -256,48 +257,74 @@ impl Mijot {
     // --- Volet ---------------------------------------------------------------
 
     pub(super) fn volet_suggestion(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let volet = self.suggestion.as_ref()?;
-        let i = &self.cat.ingredients[self.cat.index_ingredient(volet.ingredient)?];
+        let etat = self.suggestion.as_ref()?;
+        let i = &self.cat.ingredients[self.cat.index_ingredient(etat.ingredient)?];
         let theme = cx.theme();
-        let (discret, bordure, survol, rayon) = (
+        let (discret, bordure, survol, rayon, primaire) = (
             theme.muted_foreground,
             theme.border,
-            theme.accent.opacity(0.5),
+            theme.accent,
             theme.radius,
+            theme.primary,
         );
         let par = i.unite.prix_par();
-        let titre = |texte: &'static str| {
-            div()
-                .text_sm()
-                .font_weight(FontWeight::SEMIBOLD)
-                .child(texte)
-        };
+        let (icone, teinte) = visuel_rayon(i.rayon);
 
-        let mut corps = v_flex().gap_3();
+        let mut panneau = volet("volet-suggestion", 420., cx)
+            .child(entete_volet(
+                pastille(icone, teinte, 48., cx),
+                i.nom.clone(),
+                format!("Prix actuel : {} {par}", ecrire_nombre(i.prix)),
+                Button::new("fermer-suggestion")
+                    .small()
+                    .ghost()
+                    .icon(IconName::X)
+                    .tooltip("Fermer")
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.suggestion = None;
+                        cx.notify();
+                    })),
+                cx,
+            ))
+            .children(
+                etat.erreur
+                    .as_ref()
+                    .map(|erreur| Alert::warning("erreur-suggestion", erreur.clone())),
+            );
 
-        if volet.choix {
-            corps = corps
-                .child(div().text_sm().text_color(discret).child(
-                    "Choisis la catégorie Open Food Facts qui correspond le mieux à l'ingrédient. Elle est retenue pour les prochaines fois.",
-                ))
+        if etat.choix {
+            let mut choix = carte(cx)
+                .gap_3()
+                .child(
+                    v_flex()
+                        .gap_1()
+                        .child(
+                            div()
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .child("Quelle catégorie ?"),
+                        )
+                        .child(div().text_sm().text_color(discret).child(
+                            "Choisis la catégorie Open Food Facts la plus proche de l'ingrédient. Elle est retenue pour les prochaines fois.",
+                        )),
+                )
                 .child(
                     h_flex()
                         .gap_2()
-                        .child(div().flex_1().child(Input::new(&volet.terme)))
+                        .child(div().flex_1().child(Input::new(&etat.terme)))
                         .child(
                             Button::new("chercher-categories")
                                 .outline()
                                 .icon(IconName::Search)
                                 .label("Chercher")
-                                .loading(volet.en_cours)
+                                .loading(etat.en_cours)
                                 .on_click(cx.listener(|this, _, _, cx| {
                                     this.chercher_categories(cx)
                                 })),
                         ),
                 );
-            match &volet.categories {
+            match &etat.categories {
                 Some(categories) if categories.is_empty() => {
-                    corps = corps.child(
+                    choix = choix.child(
                         div()
                             .text_sm()
                             .text_color(discret)
@@ -309,8 +336,10 @@ impl Mijot {
                     for (position, nom) in categories.iter().enumerate() {
                         let choisie = nom.clone();
                         liste = liste.child(
-                            div()
+                            h_flex()
                                 .id(("categorie-off", position))
+                                .justify_between()
+                                .gap_2()
                                 .px_3()
                                 .py_2()
                                 .rounded(rayon)
@@ -318,46 +347,70 @@ impl Mijot {
                                 .border_color(bordure)
                                 .text_sm()
                                 .cursor_pointer()
-                                .hover(move |ligne| ligne.bg(survol))
+                                .hover(move |ligne| {
+                                    ligne.bg(survol).border_color(primaire.opacity(0.45))
+                                })
                                 .on_click(cx.listener(move |this, _, _, cx| {
                                     this.choisir_categorie(choisie.clone(), cx)
                                 }))
-                                .child(nom.clone()),
+                                .child(div().flex_1().min_w_0().child(nom.clone()))
+                                .child(
+                                    Icon::new(IconName::ChevronRight)
+                                        .small()
+                                        .text_color(discret),
+                                ),
                         );
                     }
-                    corps = corps.child(liste);
+                    choix = choix.child(liste);
                 }
                 None => {}
             }
+            panneau = panneau.child(choix);
         } else {
-            corps = corps.child(
-                h_flex()
-                    .justify_between()
-                    .gap_2()
-                    .child(div().flex_1().min_w_0().text_sm().child(match &i.off {
-                        Some(categorie) => format!("Catégorie : {}", categorie.nom),
-                        None => "Catégorie non choisie".to_owned(),
-                    }))
-                    .child(
-                        Button::new("changer-categorie")
-                            .small()
-                            .ghost()
-                            .label("Changer")
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                let Some(volet) = &mut this.suggestion else {
-                                    return;
-                                };
-                                volet.choix = true;
-                                volet.erreur = None;
-                                // Première ouverture du choix : chercher d'après le nom.
-                                if volet.categories.is_none() {
-                                    this.chercher_categories(cx);
-                                }
-                                cx.notify();
-                            })),
-                    ),
+            panneau = panneau.child(
+                carte(cx).p_3().child(
+                    h_flex()
+                        .justify_between()
+                        .gap_2()
+                        .child(
+                            v_flex()
+                                .flex_1()
+                                .min_w_0()
+                                .child(titre_section("Catégorie", cx))
+                                .child(div().text_sm().child(match &i.off {
+                                    Some(categorie) => categorie.nom.clone(),
+                                    None => "Non choisie".to_owned(),
+                                })),
+                        )
+                        .child(
+                            Button::new("changer-categorie")
+                                .small()
+                                .outline()
+                                .label("Changer")
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    let Some(etat) = &mut this.suggestion else {
+                                        return;
+                                    };
+                                    etat.choix = true;
+                                    etat.erreur = None;
+                                    // Première ouverture du choix : chercher d'après le nom.
+                                    if etat.categories.is_none() {
+                                        this.chercher_categories(cx);
+                                    }
+                                    cx.notify();
+                                })),
+                        ),
+                ),
             );
-            match &volet.resultat {
+            if etat.en_cours {
+                panneau = panneau.child(
+                    div()
+                        .text_sm()
+                        .text_color(discret)
+                        .child("Interrogation d'Open Prices…"),
+                );
+            }
+            match &etat.resultat {
                 Some(Some(suggestion)) => {
                     let n = suggestion.releves.len();
                     let origine = match suggestion.zone {
@@ -375,65 +428,87 @@ impl Mijot {
                         ),
                         _ => String::new(),
                     };
-                    corps = corps
-                        .child(
-                            h_flex()
-                                .gap_2()
-                                .items_end()
-                                .child(
-                                    div()
-                                        .text_2xl()
-                                        .font_weight(FontWeight::SEMIBOLD)
-                                        .child(euros(suggestion.mediane)),
-                                )
-                                .child(div().pb_1().text_sm().text_color(discret).child(format!(
-                                    "{} · prix médian",
-                                    par.trim_start_matches("€ ")
-                                ))),
-                        )
-                        .child(div().text_sm().text_color(discret).child(format!(
-                            "{origine}{periode}. La moitié est entre {} et {}.",
-                            euros(suggestion.bas),
-                            euros(suggestion.haut)
-                        )))
-                        .child({
-                            let (mediane, bas) = (suggestion.mediane, suggestion.bas);
-                            h_flex()
-                                .gap_2()
-                                .flex_wrap()
-                                .child(
-                                    Button::new("appliquer-mediane")
-                                        .primary()
-                                        .label(format!("Appliquer {}", euros(mediane)))
-                                        .on_click(cx.listener(move |this, _, window, cx| {
-                                            this.appliquer_suggestion(mediane, window, cx)
-                                        })),
-                                )
-                                // Le premier quartile : plus proche d'un premier prix.
-                                .when(bas < mediane, |ligne| {
-                                    ligne.child(
-                                        Button::new("appliquer-bas")
-                                            .outline()
-                                            .label(format!("Prix bas : {}", euros(bas)))
-                                            .tooltip("Un quart des relevés est en dessous")
-                                            .on_click(cx.listener(move |this, _, window, cx| {
-                                                this.appliquer_suggestion(bas, window, cx)
-                                            })),
+                    let (mediane, bas) = (suggestion.mediane, suggestion.bas);
+                    panneau = panneau.child(
+                        carte(cx)
+                            .gap_3()
+                            .child(
+                                v_flex()
+                                    .child(titre_section("Prix médian relevé", cx))
+                                    .child(
+                                        h_flex()
+                                            .gap_2()
+                                            .items_end()
+                                            .child(
+                                                div()
+                                                    .text_3xl()
+                                                    .font_weight(FontWeight::BOLD)
+                                                    .text_color(primaire)
+                                                    .child(euros(mediane)),
+                                            )
+                                            .child(
+                                                div()
+                                                    .pb_1()
+                                                    .text_sm()
+                                                    .text_color(discret)
+                                                    .child(par.trim_start_matches("€ ")),
+                                            ),
+                                    ),
+                            )
+                            .child(div().text_sm().text_color(discret).child(format!(
+                                "{origine}{periode}. La moitié est entre {} et {}.",
+                                euros(suggestion.bas),
+                                euros(suggestion.haut)
+                            )))
+                            .child(
+                                h_flex()
+                                    .gap_2()
+                                    .flex_wrap()
+                                    .child(
+                                        Button::new("appliquer-mediane")
+                                            .primary()
+                                            .icon(IconName::Check)
+                                            .label(format!("Appliquer {}", euros(mediane)))
+                                            .on_click(cx.listener(
+                                                move |this, _, window, cx| {
+                                                    this.appliquer_suggestion(mediane, window, cx)
+                                                },
+                                            )),
                                     )
-                                })
-                        })
-                        .child(div().text_xs().text_color(discret).child(
-                            "Une catégorie large mêle premiers prix, marques et bio : affine-la avec « Changer » si la fourchette est trop étendue.",
-                        ))
-                        .child(titre("Relevés utilisés"));
-                    let mut liste = v_flex().gap_2();
-                    for releve in suggestion.releves.iter().take(RELEVES_AFFICHES) {
+                                    // Le premier quartile : plus proche d'un premier prix.
+                                    .when(bas < mediane, |ligne| {
+                                        ligne.child(
+                                            Button::new("appliquer-bas")
+                                                .outline()
+                                                .label(format!("Prix bas : {}", euros(bas)))
+                                                .tooltip("Un quart des relevés est en dessous")
+                                                .on_click(cx.listener(
+                                                    move |this, _, window, cx| {
+                                                        this.appliquer_suggestion(bas, window, cx)
+                                                    },
+                                                )),
+                                        )
+                                    }),
+                            )
+                            .child(div().text_xs().text_color(discret).child(
+                                "Une catégorie large mêle premiers prix, marques et bio : affine-la avec « Changer » si la fourchette est trop étendue.",
+                            )),
+                    );
+
+                    let mut liste = carte(cx).py_2();
+                    for (position, releve) in
+                        suggestion.releves.iter().take(RELEVES_AFFICHES).enumerate()
+                    {
                         liste = liste.child(
                             h_flex()
                                 .justify_between()
                                 .items_start()
                                 .gap_3()
+                                .py_1p5()
                                 .text_sm()
+                                .when(position > 0, |ligne| {
+                                    ligne.border_t_1().border_color(bordure)
+                                })
                                 .child(
                                     v_flex()
                                         .flex_1()
@@ -449,90 +524,44 @@ impl Mijot {
                                             ),
                                         ),
                                 )
-                                .child(div().flex_shrink_0().child(euros(releve.prix))),
+                                .child(
+                                    div()
+                                        .flex_shrink_0()
+                                        .font_weight(FontWeight::MEDIUM)
+                                        .child(euros(releve.prix)),
+                                ),
                         );
                     }
-                    corps = corps.child(liste);
-                    if n > RELEVES_AFFICHES {
-                        corps = corps.child(
-                            div()
-                                .text_xs()
-                                .text_color(discret)
-                                .child(format!("… et {} autres relevés.", n - RELEVES_AFFICHES)),
-                        );
-                    }
+                    panneau = panneau
+                        .child(titre_section(
+                            if n > RELEVES_AFFICHES {
+                                format!(
+                                    "Relevés utilisés · les {RELEVES_AFFICHES} plus récents sur {n}"
+                                )
+                            } else {
+                                "Relevés utilisés".to_owned()
+                            },
+                            cx,
+                        ))
+                        .child(liste);
                 }
                 Some(None) => {
-                    corps = corps.child(div().text_sm().child(format!(
+                    let mut vide = carte(cx).gap_2().child(div().text_sm().child(format!(
                         "Pas assez de relevés exploitables pour cette catégorie (il en faut au moins {RELEVES_MIN})."
                     )));
                     if i.unite == Unite::Piece {
-                        corps = corps.child(div().text_sm().text_color(discret).child(
+                        vide = vide.child(div().text_sm().text_color(discret).child(
                             "Pour un ingrédient compté à la pièce, seuls les produits relevés à l'unité (fruits et légumes surtout) sont utilisables : un paquet ne dit pas combien de pièces il contient.",
                         ));
                     }
+                    panneau = panneau.child(vide);
                 }
                 None => {}
             }
         }
 
         Some(
-            v_flex()
-                .id("volet-suggestion")
-                .w(px(400.))
-                .flex_shrink_0()
-                .overflow_y_scroll()
-                .border_l_1()
-                .border_color(bordure)
-                .p_5()
-                .gap_4()
-                .child(
-                    div()
-                        .flex()
-                        .justify_between()
-                        .gap_2()
-                        .child(
-                            v_flex()
-                                .flex_1()
-                                .min_w_0()
-                                .child(
-                                    div()
-                                        .text_lg()
-                                        .font_weight(FontWeight::SEMIBOLD)
-                                        .child(i.nom.clone()),
-                                )
-                                .child(div().text_sm().text_color(discret).child(format!(
-                                    "Prix actuel : {} {par}",
-                                    ecrire_nombre(i.prix)
-                                ))),
-                        )
-                        .child(
-                            Button::new("fermer-suggestion")
-                                .small()
-                                .ghost()
-                                .icon(IconName::X)
-                                .tooltip("Fermer")
-                                .on_click(cx.listener(|this, _, _, cx| {
-                                    this.suggestion = None;
-                                    cx.notify();
-                                })),
-                        ),
-                )
-                .children(
-                    volet
-                        .erreur
-                        .as_ref()
-                        .map(|erreur| Alert::warning("erreur-suggestion", erreur.clone())),
-                )
-                .when(volet.en_cours && !volet.choix, |v| {
-                    v.child(
-                        div()
-                            .text_sm()
-                            .text_color(discret)
-                            .child("Interrogation d'Open Prices…"),
-                    )
-                })
-                .child(corps)
+            panneau
                 .child(div().text_xs().text_color(discret).child(
                     "Source : Open Prices (Open Food Facts), relevés contributifs sous licence ODbL. Seuls le terme cherché et la catégorie choisie sont envoyés.",
                 ))
