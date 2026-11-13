@@ -1,0 +1,4 @@
+[toolchain]
+# GPUI Kit (gpui-pre) exige un Rust récent (std::hint::cold_path).
+channel = "1.98"
+components = ["rustfmt", "clippy"]

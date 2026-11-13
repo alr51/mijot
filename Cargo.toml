@@ -1,0 +1,24 @@
+[package]
+name = "mijot"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98"
+publish = false
+description = "Menus de la semaine à budget donné et liste de courses (GPUI Kit, 100 % local)"
+
+[dependencies]
+# GPUI Kit embarque GPUI : version exacte, ne jamais ajouter `gpui` séparément.
+gpui-kit = "=0.9.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+directories = "6"
+fastrand = "2"
+rusqlite = { version = "0.42", features = ["bundled"] }
+
+[profile.release]
+lto = "thin"
+strip = "debuginfo"
+
+[profile.dev.package."*"]
+# Les dépendances (GPUI) compilées optimisées : l'UI reste fluide en debug.
+opt-level = 2
