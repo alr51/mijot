@@ -39,7 +39,10 @@ cargo test    # catalogue SQLite, planificateur, liste de courses, état, lectur
 | `src/plan.rs`         | Coûts, composition d'un menu dans le budget, liste de courses       |
 | `src/prix_ouverts.rs` | Suggestions de prix : appels à Open Prices, calcul de la médiane    |
 | `src/etat.rs`         | État de l'interface (budget, menu, cases cochées), en JSON          |
-| `src/ui.rs`           | Fenêtre, menu de la semaine, liste de courses                       |
+| `src/ui.rs`           | Fenêtre : état, actions, barre latérale                             |
+| `src/ui/style.rs`     | Palette (claire et sombre), pictogrammes, briques de mise en page   |
+| `src/ui/menu.rs`      | Page « Cette semaine »                                              |
+| `src/ui/courses.rs`   | Page « Liste de courses »                                           |
 | `src/ui/recettes.rs`  | Liste des recettes, volet de lecture, formulaire d'édition          |
 | `src/ui/prix.rs`      | Onglet « Ingrédients et prix »                                      |
 | `src/ui/suggestion.rs`| Volet « Prix suggéré »                                              |

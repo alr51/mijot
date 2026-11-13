@@ -56,6 +56,7 @@ fn main() {
         .run(move |cx| {
             gpui_kit::init(cx);
             Theme::sync_system_appearance(None, cx);
+            ui::appliquer_palette(cx);
             cx.on_window_closed(|cx, _| {
                 if cx.windows().is_empty() {
                     cx.quit();
@@ -63,10 +64,10 @@ fn main() {
             })
             .detach();
 
-            let bounds = Bounds::centered(None, size(px(1180.), px(800.)), cx);
+            let bounds = Bounds::centered(None, size(px(1280.), px(840.)), cx);
             let options = WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
-                window_min_size: Some(size(px(640.), px(480.))),
+                window_min_size: Some(size(px(900.), px(560.))),
                 titlebar: Some(TitlebarOptions {
                     title: Some("Mijot".into()),
                     ..Default::default()

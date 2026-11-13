@@ -16,6 +16,7 @@ use gpui_kit::component::{
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
+use super::style::{entete, etat_vide, pastille, visuel_categorie};
 use super::{Liste, Mijot, ecrire_nombre, lire_nombre, liste, quantite_recette, selecteur};
 use crate::catalogue::{Catalogue, Recette};
 use crate::donnees::Categorie;
@@ -309,17 +310,17 @@ impl Mijot {
 
         let mut lignes = v_flex().gap_1();
         if visibles.is_empty() {
-            lignes = lignes.child(
-                div()
-                    .py_6()
-                    .text_sm()
-                    .text_color(discret)
-                    .child("Aucune recette ne correspond."),
-            );
+            lignes = lignes.child(etat_vide(
+                IconName::Search,
+                "Aucune recette ne correspond",
+                "Essaie un autre mot : un nom de plat, une catégorie ou un ingrédient.",
+                cx,
+            ));
         }
         for r in visibles {
             let recette = &self.cat.recettes[r];
             let id = recette.id;
+            let (icone, teinte) = visuel_categorie(recette.categorie);
             let ouverte = self.detail == Some(id);
             lignes = lignes.child(
                 h_flex()
@@ -338,10 +339,22 @@ impl Mijot {
                     }))
                     .child(
                         h_flex()
+                            .flex_1()
+                            .min_w_0()
                             .gap_3()
-                            .flex_wrap()
-                            .child(div().child(recette.nom.clone()))
-                            .child(self.etiquettes(r)),
+                            .child(pastille(icone, teinte, 36., cx))
+                            .child(
+                                v_flex()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .gap_1()
+                                    .child(
+                                        div()
+                                            .font_weight(FontWeight::MEDIUM)
+                                            .child(recette.nom.clone()),
+                                    )
+                                    .child(self.etiquettes(r)),
+                            ),
                     )
                     .child(
                         div()
@@ -357,8 +370,16 @@ impl Mijot {
         }
 
         v_flex()
-            .max_w(px(820.))
+            .max_w(px(860.))
             .gap_4()
+            .child(entete(
+                "Recettes",
+                match self.cat.recettes.len() {
+                    1 => "1 recette au catalogue. Clique dessus pour la voir ou la modifier.".to_owned(),
+                    n => format!("{n} recettes au catalogue. Clique sur l'une d'elles pour la voir ou la modifier."),
+                },
+                cx,
+            ))
             .child(
                 h_flex()
                     .gap_2()

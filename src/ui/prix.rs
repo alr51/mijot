@@ -13,6 +13,7 @@ use gpui_kit::component::{
 };
 use gpui_kit::*;
 
+use super::style::{carte, entete, pastille, visuel_rayon};
 use super::{Liste, Mijot, ecrire_nombre, lire_nombre, liste, selecteur};
 use crate::catalogue::Catalogue;
 use crate::donnees::{Rayon, Unite};
@@ -196,12 +197,7 @@ impl Mijot {
 
     pub(super) fn page_prix(&self, cx: &mut Context<Self>) -> Div {
         let theme = cx.theme();
-        let (discret, bordure, fond, rayon_bord) = (
-            theme.muted_foreground,
-            theme.border,
-            theme.group_box,
-            theme.radius,
-        );
+        let (discret, bordure) = (theme.muted_foreground, theme.border);
         let aiguille = self.prix.filtre.read(cx).value().trim().to_lowercase();
         let unite_choisie = self
             .prix
@@ -211,13 +207,8 @@ impl Mijot {
             .copied()
             .unwrap_or(Unite::G);
 
-        let nouveau = v_flex()
+        let nouveau = carte(cx)
             .gap_3()
-            .p_4()
-            .rounded(rayon_bord)
-            .border_1()
-            .border_color(bordure)
-            .bg(fond)
             .child(
                 div()
                     .text_sm()
@@ -256,13 +247,13 @@ impl Mijot {
             );
 
         let mut page = v_flex()
-            .max_w(px(820.))
+            .max_w(px(860.))
             .gap_5()
-            .child(
-                div().text_sm().text_color(discret).child(
-                    "Les prix servent à estimer le coût des recettes et de la liste de courses. Une modification est enregistrée dès la saisie. « Suggérer » propose un prix d'après les relevés d'Open Prices.",
-                ),
-            )
+            .child(entete(
+                "Ingrédients et prix",
+                "Les prix servent à estimer le coût des recettes et des courses. Une modification est enregistrée dès la saisie ; « Suggérer » propose un prix d'après les relevés d'Open Prices.",
+                cx,
+            ))
             .child(nouveau)
             .child(
                 Input::new(&self.prix.filtre)
@@ -286,13 +277,13 @@ impl Mijot {
                 continue;
             }
             trouves += ingredients.len();
-            let mut section = v_flex().gap_1().child(
-                div()
-                    .pb_1()
-                    .border_b_1()
-                    .border_color(bordure)
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child(rayon.nom()),
+            let (icone, teinte) = visuel_rayon(rayon);
+            let mut section = carte(cx).gap_1().child(
+                h_flex()
+                    .gap_3()
+                    .pb_2()
+                    .child(pastille(icone, teinte, 32., cx))
+                    .child(div().font_weight(FontWeight::SEMIBOLD).child(rayon.nom())),
             );
             for (position, i) in ingredients {
                 let id = i.id;
@@ -321,6 +312,8 @@ impl Mijot {
                     h_flex()
                         .gap_3()
                         .py_1()
+                        .border_t_1()
+                        .border_color(bordure)
                         .child(div().flex_1().min_w_0().child(i.nom.clone()))
                         .child(usage)
                         .child(

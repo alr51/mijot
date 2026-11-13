@@ -1,23 +1,23 @@
-//! Fenêtre principale : menu de la semaine et liste de courses. Le catalogue
-//! (recettes, ingrédients et prix) a ses écrans dans les sous-modules.
+//! Fenêtre principale : état, actions, barre latérale. Chaque page a son
+//! sous-module ; `style` porte la palette et les briques visuelles communes.
 
+mod courses;
+mod menu;
 mod prix;
 mod recettes;
+mod style;
 mod suggestion;
+
+pub use style::appliquer_palette;
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::{
-    ActiveTheme as _, Disableable as _, Sizable as _, Theme, ThemeMode,
+    ActiveTheme as _, Icon, Sizable as _, Size, Theme, ThemeMode,
     alert::Alert,
-    button::{Button, ButtonVariants as _},
-    checkbox::Checkbox,
     h_flex,
-    input::{Input, InputEvent, InputState},
-    progress::Progress,
+    input::{InputEvent, InputState},
     searchable_list::SearchableListItem,
     select::{SearchableVec, SelectState},
-    switch::Switch,
-    tab::{Tab, TabBar},
     tag::Tag,
     v_flex,
 };
@@ -28,8 +28,8 @@ use crate::catalogue::Catalogue;
 use crate::donnees::Unite;
 use crate::etat::{Etat, Extra};
 use crate::plan::{
-    Echec, PERSONNES_MAX, REPAS_MAX, cout_menu, cout_par_personne, euros, generer,
-    liste_de_courses, quantite_lisible, remplacantes,
+    Echec, PERSONNES_MAX, REPAS_MAX, euros, generer, liste_de_courses, quantite_lisible,
+    remplacantes,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -398,34 +398,10 @@ impl Mijot {
 
     // --- Éléments communs ----------------------------------------------------
 
-    fn bouton_theme(&self, cx: &mut Context<Self>) -> Button {
-        let sombre = cx.theme().is_dark();
-        Button::new("theme")
-            .small()
-            .ghost()
-            .icon(if sombre {
-                IconName::Sun
-            } else {
-                IconName::Moon
-            })
-            .tooltip(if sombre {
-                "Thème clair"
-            } else {
-                "Thème sombre"
-            })
-            .on_click(cx.listener(|_, _, window, cx| {
-                let mode = if cx.theme().is_dark() {
-                    ThemeMode::Light
-                } else {
-                    ThemeMode::Dark
-                };
-                Theme::change(mode, Some(window), cx);
-            }))
-    }
-
-    fn onglets(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    /// Articles de la liste de courses pas encore cochés.
+    fn articles_restants(&self) -> usize {
         let menu = self.etat.menu_indices(&self.cat);
-        let restants = liste_de_courses(&self.cat, &menu, self.etat.personnes)
+        liste_de_courses(&self.cat, &menu, self.etat.personnes)
             .iter()
             .flat_map(|(_, lignes)| lignes)
             .filter(|l| {
@@ -435,28 +411,158 @@ impl Mijot {
                     .contains(&self.cat.ingredients[l.ingredient].id)
             })
             .count()
-            + self.etat.extras.iter().filter(|e| !e.coche).count();
-        let libelle = |o: Onglet| match o {
-            Onglet::Menu => "Menu de la semaine".to_owned(),
-            Onglet::Courses if restants > 0 => format!("Liste de courses ({restants})"),
-            Onglet::Courses => "Liste de courses".to_owned(),
-            Onglet::Recettes => format!("Recettes ({})", self.cat.recettes.len()),
-            Onglet::Prix => "Ingrédients et prix".to_owned(),
-        };
-        let selection = ONGLETS.iter().position(|o| *o == self.onglet).unwrap_or(0);
-        TabBar::new("onglets")
-            .underline()
-            .px_4()
-            .selected_index(selection)
-            .suffix(div().pr_3().child(self.bouton_theme(cx)))
-            .children(ONGLETS.iter().map(|o| Tab::new().label(libelle(*o))))
-            .on_click(cx.listener(|this, ix: &usize, _, cx| {
-                if let Some(o) = ONGLETS.get(*ix) {
-                    this.onglet = *o;
+            + self.etat.extras.iter().filter(|e| !e.coche).count()
+    }
+
+    /// Ligne de la barre latérale : pictogramme, libellé, pastille de compte.
+    fn entree_navigation(
+        id: impl Into<ElementId>,
+        icone: IconName,
+        libelle: &'static str,
+        compte: Option<usize>,
+        active: bool,
+        cx: &App,
+    ) -> Stateful<Div> {
+        let theme = cx.theme();
+        let (primaire, sur_primaire, survol, rayon) = (
+            theme.primary,
+            theme.primary_foreground,
+            theme.accent,
+            theme.radius,
+        );
+        h_flex()
+            .id(id)
+            .gap_3()
+            .px_3()
+            .py_2()
+            .rounded(rayon)
+            .text_sm()
+            .cursor_pointer()
+            .when(active, |ligne| {
+                ligne
+                    .bg(primaire.opacity(0.12))
+                    .text_color(primaire)
+                    .font_weight(FontWeight::SEMIBOLD)
+            })
+            .when(!active, |ligne| ligne.hover(move |ligne| ligne.bg(survol)))
+            .child(Icon::new(icone).small())
+            .child(div().flex_1().min_w_0().child(libelle))
+            .children(compte.filter(|n| *n > 0).map(|n| {
+                div()
+                    .px_2()
+                    .rounded_full()
+                    .bg(primaire)
+                    .text_xs()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(sur_primaire)
+                    .child(n.to_string())
+            }))
+    }
+
+    /// Barre latérale : nom de l'application, pages, bascule clair/sombre.
+    fn navigation(&self, cx: &mut Context<Self>) -> Div {
+        let theme = cx.theme();
+        let (discret, bordure, fond, primaire, sur_primaire, sombre) = (
+            theme.muted_foreground,
+            theme.border,
+            theme.sidebar,
+            theme.primary,
+            theme.primary_foreground,
+            theme.is_dark(),
+        );
+        let restants = self.articles_restants();
+        let mut barre = v_flex()
+            .w(px(224.))
+            .flex_shrink_0()
+            .gap_1()
+            .p_3()
+            .bg(fond)
+            .border_r_1()
+            .border_color(bordure)
+            .child(
+                h_flex()
+                    .gap_3()
+                    .px_2()
+                    .pt_2()
+                    .pb_4()
+                    .child(
+                        div()
+                            .flex()
+                            .flex_shrink_0()
+                            .items_center()
+                            .justify_center()
+                            .size(px(38.))
+                            .rounded(px(11.))
+                            .bg(primaire)
+                            .child(
+                                Icon::new(IconName::ChefHat)
+                                    .with_size(Size::Size(px(22.)))
+                                    .text_color(sur_primaire),
+                            ),
+                    )
+                    .child(
+                        v_flex()
+                            .child(div().text_lg().font_weight(FontWeight::BOLD).child("Mijot"))
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(discret)
+                                    .child("Menus et courses"),
+                            ),
+                    ),
+            );
+        for (position, onglet) in ONGLETS.into_iter().enumerate() {
+            let (icone, libelle, compte) = match onglet {
+                Onglet::Menu => (IconName::CalendarDays, "Cette semaine", None),
+                Onglet::Courses => (IconName::ShoppingCart, "Liste de courses", Some(restants)),
+                Onglet::Recettes => (IconName::BookOpen, "Recettes", None),
+                Onglet::Prix => (IconName::Coins, "Ingrédients et prix", None),
+            };
+            barre = barre.child(
+                Self::entree_navigation(
+                    ("page", position),
+                    icone,
+                    libelle,
+                    compte,
+                    self.onglet == onglet,
+                    cx,
+                )
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.onglet = onglet;
                     this.avis = None;
                     cx.notify();
-                }
-            }))
+                })),
+            );
+        }
+        barre.child(div().flex_1()).child(
+            Self::entree_navigation(
+                "theme",
+                if sombre {
+                    IconName::Sun
+                } else {
+                    IconName::Moon
+                },
+                if sombre {
+                    "Thème clair"
+                } else {
+                    "Thème sombre"
+                },
+                None,
+                false,
+                cx,
+            )
+            .text_color(discret)
+            .on_click(cx.listener(|_, _, window, cx| {
+                let mode = if cx.theme().is_dark() {
+                    ThemeMode::Light
+                } else {
+                    ThemeMode::Dark
+                };
+                Theme::change(mode, Some(window), cx);
+                // Le changement de mode recharge les couleurs neutres.
+                appliquer_palette(cx);
+            })),
+        )
     }
 
     fn etiquettes(&self, recette: usize) -> Div {
@@ -475,432 +581,15 @@ impl Mijot {
                     .child(format!("{} min", r.minutes)),
             )
     }
-
-    // --- Menu ----------------------------------------------------------------
-
-    fn compteur(&self, compteur: Compteur, cx: &mut Context<Self>) -> Div {
-        let (libelle, valeur, ids) = match compteur {
-            Compteur::Personnes => (
-                "Personnes",
-                self.etat.personnes as usize,
-                ("p-moins", "p-plus"),
-            ),
-            Compteur::Repas => ("Repas", self.etat.repas, ("r-moins", "r-plus")),
-        };
-        h_flex()
-            .gap_2()
-            .child(
-                div()
-                    .text_sm()
-                    .text_color(cx.theme().muted_foreground)
-                    .child(libelle),
-            )
-            .child(
-                Button::new(ids.0)
-                    .small()
-                    .outline()
-                    .icon(IconName::Minus)
-                    .on_click(cx.listener(move |this, _, _, cx| this.ajuster(compteur, -1, cx))),
-            )
-            .child(
-                div()
-                    .w(px(24.))
-                    .text_center()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child(valeur.to_string()),
-            )
-            .child(
-                Button::new(ids.1)
-                    .small()
-                    .outline()
-                    .icon(IconName::Plus)
-                    .on_click(cx.listener(move |this, _, _, cx| this.ajuster(compteur, 1, cx))),
-            )
-    }
-
-    fn reglages(&self, cx: &mut Context<Self>) -> Div {
-        let theme = cx.theme();
-        let (bordure, fond, discret, rayon) = (
-            theme.border,
-            theme.group_box,
-            theme.muted_foreground,
-            theme.radius,
-        );
-        h_flex()
-            .flex_wrap()
-            .gap_x_6()
-            .gap_y_3()
-            .p_4()
-            .rounded(rayon)
-            .border_1()
-            .border_color(bordure)
-            .bg(fond)
-            .child(
-                h_flex()
-                    .gap_2()
-                    .child(div().text_sm().text_color(discret).child("Budget"))
-                    .child(div().w(px(88.)).child(Input::new(&self.budget)))
-                    .child(div().text_sm().text_color(discret).child("€ / semaine")),
-            )
-            .child(self.compteur(Compteur::Personnes, cx))
-            .child(self.compteur(Compteur::Repas, cx))
-            .child(
-                Switch::new("vege")
-                    .checked(self.etat.vege)
-                    .label("Végétarien")
-                    .on_click(cx.listener(|this, on: &bool, _, cx| {
-                        this.etat.vege = *on;
-                        this.avis = None;
-                        this.sauver(cx);
-                    })),
-            )
-            .child(div().flex_1())
-            .child(
-                Button::new("generer")
-                    .primary()
-                    .icon(IconName::RefreshCw)
-                    .label(if self.etat.menu.is_empty() {
-                        "Générer le menu"
-                    } else {
-                        "Nouveau menu"
-                    })
-                    .on_click(cx.listener(|this, _, _, cx| this.generer(cx))),
-            )
-    }
-
-    fn bilan(&self, menu: &[usize], cx: &mut Context<Self>) -> Div {
-        let theme = cx.theme();
-        let cout = cout_menu(&self.cat, menu, self.etat.personnes);
-        let budget = self.etat.budget;
-        let depasse = cout > budget + 1e-9;
-        let couleur = if depasse { theme.danger } else { theme.success };
-        let portions = (menu.len() as f64 * f64::from(self.etat.personnes)).max(1.);
-        let reste = if depasse {
-            format!("dépassement de {}", euros(cout - budget))
-        } else {
-            format!("reste {}", euros(budget - cout))
-        };
-        let part = if budget > 0. {
-            (cout / budget * 100.).min(100.) as f32
-        } else {
-            100.
-        };
-        v_flex()
-            .gap_2()
-            .child(
-                h_flex()
-                    .justify_between()
-                    .items_end()
-                    .child(
-                        h_flex()
-                            .gap_2()
-                            .items_end()
-                            .child(
-                                div()
-                                    .text_2xl()
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .text_color(couleur)
-                                    .child(euros(cout)),
-                            )
-                            .child(
-                                div()
-                                    .pb_1()
-                                    .text_sm()
-                                    .text_color(theme.muted_foreground)
-                                    .child(format!("sur {} · {reste}", euros(budget))),
-                            ),
-                    )
-                    .child(
-                        div()
-                            .pb_1()
-                            .text_sm()
-                            .text_color(theme.muted_foreground)
-                            .child(format!(
-                                "{} repas · {} par assiette",
-                                menu.len(),
-                                euros(cout / portions)
-                            )),
-                    ),
-            )
-            .child(Progress::new("budget").value(part).color(couleur))
-    }
-
-    fn carte(
-        &self,
-        position: usize,
-        total: usize,
-        recette: usize,
-        cx: &mut Context<Self>,
-    ) -> Stateful<Div> {
-        let theme = cx.theme();
-        let r = &self.cat.recettes[recette];
-        let id = r.id;
-        let par_personne = cout_par_personne(&self.cat, recette);
-        let ouverte = self.detail == Some(id);
-        v_flex()
-            .id(("carte", position))
-            .w(px(250.))
-            .p_4()
-            .gap_2()
-            .rounded(theme.radius)
-            .border_1()
-            .border_color(if ouverte { theme.primary } else { theme.border })
-            .bg(theme.group_box)
-            .cursor_pointer()
-            .on_click(cx.listener(move |this, _, _, cx| {
-                this.detail = Some(id);
-                cx.notify();
-            }))
-            .child(
-                div()
-                    .text_xs()
-                    .text_color(theme.muted_foreground)
-                    .child(libelle_repas(position, total)),
-            )
-            .child(
-                div()
-                    .h(px(48.))
-                    .line_height(px(24.))
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .line_clamp(2)
-                    .child(r.nom.clone()),
-            )
-            .child(self.etiquettes(recette))
-            .child(
-                div()
-                    .text_sm()
-                    .text_color(theme.muted_foreground)
-                    .child(format!(
-                        "≈ {} · {} par personne",
-                        euros(par_personne * f64::from(self.etat.personnes)),
-                        euros(par_personne)
-                    )),
-            )
-            .child(
-                h_flex()
-                    .gap_2()
-                    .justify_between()
-                    .child(
-                        Button::new(("changer", position))
-                            .small()
-                            .outline()
-                            .icon(IconName::RefreshCw)
-                            .label("Changer")
-                            .on_click(cx.listener(move |this, _, _, cx| {
-                                cx.stop_propagation();
-                                this.changer(position, cx);
-                            })),
-                    )
-                    .child(
-                        Button::new(("retirer", position))
-                            .small()
-                            .ghost()
-                            .icon(IconName::X)
-                            .tooltip("Retirer du menu")
-                            .on_click(cx.listener(move |this, _, _, cx| {
-                                cx.stop_propagation();
-                                this.retirer(position, cx);
-                            })),
-                    ),
-            )
-    }
-
-    fn page_menu(&self, cx: &mut Context<Self>) -> Div {
-        let menu = self.etat.menu_indices(&self.cat);
-        let discret = cx.theme().muted_foreground;
-        let mut page = v_flex().gap_5().child(self.reglages(cx));
-        if menu.is_empty() {
-            return page.child(
-                div()
-                    .py_10()
-                    .text_center()
-                    .text_color(discret)
-                    .child("Indique ton budget, puis clique sur « Générer le menu »."),
-            );
-        }
-        page = page.child(self.bilan(&menu, cx));
-        let total = menu.len();
-        let mut cartes = h_flex().flex_wrap().items_stretch().gap_4();
-        for (position, &recette) in menu.iter().enumerate() {
-            cartes = cartes.child(self.carte(position, total, recette, cx));
-        }
-        page.child(cartes).child(
-            div().text_xs().text_color(discret).child(
-                "Prix au prorata des quantités utilisées, d'après l'onglet « Ingrédients et prix » : un repère pour tenir le budget, pas un ticket de caisse.",
-            ),
-        )
-    }
-
-    // --- Liste de courses ----------------------------------------------------
-
-    fn page_courses(&self, cx: &mut Context<Self>) -> Div {
-        let theme = cx.theme();
-        let (discret, bordure) = (theme.muted_foreground, theme.border);
-        let menu = self.etat.menu_indices(&self.cat);
-        let liste = liste_de_courses(&self.cat, &menu, self.etat.personnes);
-        let total: f64 = liste.iter().flat_map(|(_, l)| l).map(|l| l.prix).sum();
-        let articles = liste.iter().map(|(_, l)| l.len()).sum::<usize>() + self.etat.extras.len();
-        let coches = self.etat.coches.len() + self.etat.extras.iter().filter(|e| e.coche).count();
-
-        let mut page = v_flex().max_w(px(720.)).gap_5().child(
-            h_flex()
-                .justify_between()
-                .child(
-                    v_flex()
-                        .child(
-                            div()
-                                .text_lg()
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .child(format!("Total estimé : {}", euros(total))),
-                        )
-                        .child(div().text_sm().text_color(discret).child(format!(
-                            "{coches} sur {articles} articles cochés · pour {} personne(s)",
-                            self.etat.personnes
-                        ))),
-                )
-                .child(
-                    h_flex()
-                        .gap_2()
-                        .child(
-                            Button::new("decocher")
-                                .ghost()
-                                .label("Tout décocher")
-                                .disabled(coches == 0)
-                                .on_click(cx.listener(|this, _, _, cx| this.tout_decocher(cx))),
-                        )
-                        .child(
-                            Button::new("copier")
-                                .outline()
-                                .icon(IconName::Copy)
-                                .label("Copier la liste")
-                                .disabled(articles == 0)
-                                .on_click(cx.listener(|this, _, _, cx| this.copier(cx))),
-                        ),
-                ),
-        );
-
-        if liste.is_empty() {
-            page = page.child(
-                div()
-                    .text_sm()
-                    .text_color(discret)
-                    .child("Le menu est vide : génère un menu pour remplir la liste."),
-            );
-        }
-
-        for (rayon, lignes) in &liste {
-            let sous_total: f64 = lignes.iter().map(|l| l.prix).sum();
-            let mut section = v_flex().gap_1().child(
-                h_flex()
-                    .justify_between()
-                    .pb_1()
-                    .border_b_1()
-                    .border_color(bordure)
-                    .child(div().font_weight(FontWeight::SEMIBOLD).child(rayon.nom()))
-                    .child(div().text_sm().text_color(discret).child(euros(sous_total))),
-            );
-            for ligne in lignes {
-                let i = &self.cat.ingredients[ligne.ingredient];
-                let id = i.id;
-                let coche = self.etat.coches.contains(&id);
-                section = section.child(
-                    h_flex()
-                        .justify_between()
-                        .py_1()
-                        .when(coche, |row| row.opacity(0.45))
-                        .child(
-                            Checkbox::new(("ingredient", ligne.ingredient))
-                                .checked(coche)
-                                .label(i.nom.clone())
-                                .on_click(cx.listener(move |this, on: &bool, _, cx| {
-                                    this.cocher(id, *on, cx)
-                                })),
-                        )
-                        .child(
-                            h_flex()
-                                .gap_4()
-                                .text_sm()
-                                .child(div().child(quantite_lisible(ligne.quantite, i.unite)))
-                                .child(
-                                    div()
-                                        .w(px(64.))
-                                        .text_right()
-                                        .text_color(discret)
-                                        .child(euros(ligne.prix)),
-                                ),
-                        ),
-                );
-            }
-            page = page.child(section);
-        }
-
-        let mut autres = v_flex().gap_1().child(
-            div()
-                .pb_1()
-                .border_b_1()
-                .border_color(bordure)
-                .font_weight(FontWeight::SEMIBOLD)
-                .child("Autres articles"),
-        );
-        for (position, extra) in self.etat.extras.iter().enumerate() {
-            autres = autres.child(
-                h_flex()
-                    .justify_between()
-                    .py_1()
-                    .child(
-                        div().when(extra.coche, |d| d.opacity(0.45)).child(
-                            Checkbox::new(("extra", position))
-                                .checked(extra.coche)
-                                .label(extra.nom.clone())
-                                .on_click(cx.listener(move |this, on: &bool, _, cx| {
-                                    if let Some(e) = this.etat.extras.get_mut(position) {
-                                        e.coche = *on;
-                                        this.sauver(cx);
-                                    }
-                                })),
-                        ),
-                    )
-                    .child(
-                        Button::new(("supprimer-extra", position))
-                            .small()
-                            .ghost()
-                            .icon(IconName::Trash)
-                            .tooltip("Supprimer")
-                            .on_click(cx.listener(move |this, _, _, cx| {
-                                if position < this.etat.extras.len() {
-                                    this.etat.extras.remove(position);
-                                    this.sauver(cx);
-                                }
-                            })),
-                    ),
-            );
-        }
-        autres = autres.child(
-            h_flex()
-                .gap_2()
-                .pt_2()
-                .child(div().flex_1().child(Input::new(&self.extra)))
-                .child(
-                    Button::new("ajouter-extra")
-                        .outline()
-                        .icon(IconName::Plus)
-                        .label("Ajouter")
-                        .on_click(
-                            cx.listener(|this, _, window, cx| this.ajouter_extra(window, cx)),
-                        ),
-                ),
-        );
-
-        page.child(autres).child(
-            div().text_xs().text_color(discret).child(
-                "Quantités cumulées de tous les repas ; les articles à la pièce sont arrondis à l'unité supérieure.",
-            ),
-        )
-    }
 }
 
 impl Render for Mijot {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Thème rechargé hors de l'application (bascule clair/sombre du système) :
+        // la palette est reposée, ce qui redessine la fenêtre.
+        if !style::palette_en_place(cx) {
+            cx.defer(appliquer_palette);
+        }
         let page = match self.onglet {
             Onglet::Menu => self.page_menu(cx),
             Onglet::Courses => self.page_courses(cx),
@@ -922,29 +611,25 @@ impl Render for Mijot {
             Onglet::Courses => None,
         };
         let theme = cx.theme();
-        v_flex()
+        div()
+            .flex()
             .size_full()
             .bg(theme.background)
             .text_color(theme.foreground)
-            .child(self.onglets(cx))
+            .child(self.navigation(cx))
             .child(
-                div()
-                    .flex()
+                v_flex()
+                    .id("contenu")
                     .flex_1()
-                    .min_h_0()
-                    .child(
-                        v_flex()
-                            .id("contenu")
-                            .flex_1()
-                            .min_w_0()
-                            .overflow_y_scroll()
-                            .p_6()
-                            .gap_4()
-                            .children(avis)
-                            .child(page),
-                    )
-                    .children(volet),
+                    .min_w_0()
+                    .overflow_y_scroll()
+                    .px_8()
+                    .py_6()
+                    .gap_4()
+                    .children(avis)
+                    .child(page),
             )
+            .children(volet)
     }
 }
 
