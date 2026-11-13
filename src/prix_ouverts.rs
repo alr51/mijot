@@ -23,9 +23,10 @@ use crate::donnees::Unite;
 const OPEN_PRICES: &str = "https://prices.openfoodfacts.org/api/v1";
 const OPEN_FOOD_FACTS: &str = "https://world.openfoodfacts.org/api/v3";
 
-/// Nom sous lequel l'application se présente. Open Food Facts recommande
-/// `NomDeLApplication/version (contact)` : à personnaliser si tu le souhaites.
-const AGENT: &str = "meal-planner-desktop/0.1";
+/// Nom sous lequel l'application se présente : `mijot/<version>`. Open Food
+/// Facts recommande d'y ajouter un contact, `mijot/0.1.0 (adresse)` ; aucun
+/// n'est envoyé ici.
+const AGENT: &str = concat!("mijot/", env!("CARGO_PKG_VERSION"));
 
 /// Relevés demandés par requête : le maximum accepté par l'API.
 const PAGE: &str = "100";
@@ -421,6 +422,11 @@ mod tests {
             date: date.into(),
             en_france,
         }
+    }
+
+    #[test]
+    fn nom_envoye_au_service() {
+        assert_eq!(AGENT, format!("mijot/{}", env!("CARGO_PKG_VERSION")));
     }
 
     #[test]

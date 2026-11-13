@@ -80,8 +80,8 @@ Limites à connaître :
   utilisables (un paquet ne dit pas combien de pièces il contient).
 
 Seuls le terme cherché et la catégorie choisie sont envoyés. L'application se
-présente sous un nom générique (`AGENT` dans `src/prix_ouverts.rs`) ; Open Food
-Facts recommande `NomDeLApplication/version (contact)`. Les données d'Open Prices
+présente sous son nom et sa version (`mijot/0.1.0`, constante `AGENT` de
+`src/prix_ouverts.rs`), sans contact ; Open Food Facts recommande d'en ajouter un. Les données d'Open Prices
 sont sous licence ODbL.
 
 ## Prix
