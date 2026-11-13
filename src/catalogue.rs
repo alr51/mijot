@@ -7,21 +7,29 @@
 use std::fmt;
 use std::path::Path;
 
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, OptionalExtension as _, params};
 
 use crate::donnees::{self, Categorie, Rayon, Unite};
 
 /// Version du schéma, tenue dans `PRAGMA user_version`.
-const VERSION: i64 = 2;
+const VERSION: i64 = 3;
 
-/// Passage de la version `n + 1` du schéma à la suivante, à partir de la 1.
-const MIGRATIONS: [&str; 1] = [
-    // 2 : catégorie Open Food Facts choisie pour suggérer un prix.
-    "ALTER TABLE ingredient ADD COLUMN off_tag TEXT;
-     ALTER TABLE ingredient ADD COLUMN off_nom TEXT;",
-];
+/// Amène la base de la version `vers - 1` à la version `vers`.
+fn migrer(base: &Connection, vers: i64) -> Result<(), Erreur> {
+    match vers {
+        // Catégorie Open Food Facts choisie pour suggérer un prix.
+        2 => base.execute_batch(
+            "ALTER TABLE ingredient ADD COLUMN off_tag TEXT;
+             ALTER TABLE ingredient ADD COLUMN off_nom TEXT;",
+        )?,
+        // Deuxième lot de recettes du catalogue de départ.
+        3 => ajouter_lot(base, donnees::LOT_2)?,
+        _ => unreachable!("pas de migration vers la version {vers}"),
+    }
+    Ok(())
+}
 
-/// Schéma de la version 1 ; les versions suivantes sont dans [`MIGRATIONS`].
+/// Schéma de la version 1 ; les versions suivantes sont dans [`migrer`].
 const SCHEMA: &str = "
 CREATE TABLE ingredient (
     id    INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -146,8 +154,8 @@ impl Catalogue {
                 remplir(&tx)?;
                 version = 1;
             }
-            for migration in &MIGRATIONS[(version - 1) as usize..] {
-                tx.execute_batch(migration)?;
+            for vers in version + 1..=VERSION {
+                migrer(&tx, vers)?;
             }
             tx.pragma_update(None, "user_version", VERSION)?;
             tx.commit()?;
@@ -424,36 +432,77 @@ fn verifier_prix(prix: f64) -> Result<(), Erreur> {
 
 /// Copie le catalogue de départ dans une base vide.
 fn remplir(base: &Connection) -> Result<(), Erreur> {
-    let mut ids = Vec::with_capacity(donnees::INGREDIENTS.len());
     for i in donnees::INGREDIENTS {
-        base.execute(
-            "INSERT INTO ingredient (nom, rayon, unite, prix) VALUES (?1, ?2, ?3, ?4)",
-            params![i.nom, i.rayon.code(), i.unite.code(), i.prix],
-        )?;
-        ids.push(base.last_insert_rowid());
+        inserer_ingredient(base, i)?;
     }
     for r in donnees::RECETTES {
-        base.execute(
-            "INSERT INTO recette (nom, categorie, vege, minutes) VALUES (?1, ?2, ?3, ?4)",
-            params![r.nom, r.categorie.code(), r.vege, r.minutes],
+        inserer_recette(base, r)?;
+    }
+    Ok(())
+}
+
+/// Ajoute à une base existante les recettes d'un lot du catalogue de départ.
+///
+/// Une recette dont le nom existe déjà est laissée telle quelle (elle a pu
+/// être modifiée, ou créée par l'utilisateur). Prix et ingrédients existants
+/// ne sont pas touchés ; un ingrédient supprimé entre-temps est recréé.
+fn ajouter_lot(base: &Connection, lot: &[&str]) -> Result<(), Erreur> {
+    for r in donnees::RECETTES.iter().filter(|r| lot.contains(&r.id)) {
+        let existe: bool = base.query_row(
+            "SELECT EXISTS (SELECT 1 FROM recette WHERE nom = ?1 COLLATE NOCASE)",
+            params![r.nom],
+            |ligne| ligne.get(0),
         )?;
-        let recette = base.last_insert_rowid();
-        for (position, (ingredient, quantite)) in r.ingredients.iter().enumerate() {
-            let Some(i) = donnees::index_ingredient(ingredient) else {
-                continue;
-            };
-            base.execute(
-                "INSERT INTO recette_ingredient (recette_id, position, ingredient_id, quantite)
-                 VALUES (?1, ?2, ?3, ?4)",
-                params![recette, position as i64, ids[i], quantite],
-            )?;
+        if !existe {
+            inserer_recette(base, r)?;
         }
-        for (position, texte) in r.etapes.iter().enumerate() {
-            base.execute(
-                "INSERT INTO etape (recette_id, position, texte) VALUES (?1, ?2, ?3)",
-                params![recette, position as i64, texte],
-            )?;
-        }
+    }
+    Ok(())
+}
+
+fn inserer_ingredient(base: &Connection, i: &donnees::Ingredient) -> Result<i64, Erreur> {
+    base.execute(
+        "INSERT INTO ingredient (nom, rayon, unite, prix) VALUES (?1, ?2, ?3, ?4)",
+        params![i.nom, i.rayon.code(), i.unite.code(), i.prix],
+    )?;
+    Ok(base.last_insert_rowid())
+}
+
+/// Insère une recette du catalogue de départ. Ses ingrédients sont retrouvés
+/// par leur nom, et créés s'ils manquent.
+fn inserer_recette(base: &Connection, r: &donnees::Recette) -> Result<(), Erreur> {
+    base.execute(
+        "INSERT INTO recette (nom, categorie, vege, minutes) VALUES (?1, ?2, ?3, ?4)",
+        params![r.nom, r.categorie.code(), r.vege, r.minutes],
+    )?;
+    let recette = base.last_insert_rowid();
+    for (position, (code, quantite)) in r.ingredients.iter().enumerate() {
+        let Some(i) = donnees::index_ingredient(code) else {
+            continue;
+        };
+        let depart = &donnees::INGREDIENTS[i];
+        let connu = base
+            .query_row(
+                "SELECT id FROM ingredient WHERE nom = ?1 COLLATE NOCASE ORDER BY id LIMIT 1",
+                params![depart.nom],
+                |ligne| ligne.get::<_, i64>(0),
+            )
+            .optional()?;
+        let ingredient = match connu {
+            Some(id) => id,
+            None => inserer_ingredient(base, depart)?,
+        };
+        base.execute(
+            "INSERT INTO recette_ingredient (recette_id, position, ingredient_id, quantite)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![recette, position as i64, ingredient, quantite],
+        )?;
+    }
+    for (position, texte) in r.etapes.iter().enumerate() {
+        base.execute(
+            "INSERT INTO etape (recette_id, position, texte) VALUES (?1, ?2, ?3)",
+            params![recette, position as i64, texte],
+        )?;
     }
     Ok(())
 }
@@ -590,6 +639,97 @@ mod tests {
         cat.definir_categorie_off(1, None).unwrap();
         assert_eq!(cat.ingredients[0].off, None);
         drop(cat);
+        std::fs::remove_dir_all(dossier).unwrap();
+    }
+
+    #[test]
+    fn le_lot_2_rejoint_une_base_existante() {
+        let dossier = std::env::temp_dir().join(format!("mijot-lot2-{}", std::process::id()));
+        std::fs::create_dir_all(&dossier).unwrap();
+        let chemin = dossier.join("v2.db");
+        let _ = std::fs::remove_file(&chemin);
+        let lot: Vec<&donnees::Recette> = donnees::RECETTES
+            .iter()
+            .filter(|r| donnees::LOT_2.contains(&r.id))
+            .collect();
+        let premier_lot = donnees::RECETTES.len() - lot.len();
+        // Recette du lot que l'utilisateur aurait déjà créée, à sa façon.
+        let deja = lot[0].nom;
+        {
+            // Base de la version 2, sans le lot, et qui a vécu : un prix modifié,
+            // une recette supprimée avec un de ses ingrédients, une recette maison.
+            let mut base = Connection::open(&chemin).unwrap();
+            base.pragma_update(None, "foreign_keys", true).unwrap();
+            let tx = base.transaction().unwrap();
+            tx.execute_batch(SCHEMA).unwrap();
+            remplir(&tx).unwrap();
+            migrer(&tx, 2).unwrap();
+            for r in &lot {
+                tx.execute("DELETE FROM recette WHERE nom = ?1", params![r.nom])
+                    .unwrap();
+            }
+            tx.execute(
+                "UPDATE ingredient SET prix = 7.77 WHERE nom = 'Courgettes'",
+                [],
+            )
+            .unwrap();
+            // La pizza est la seule recette du premier lot à utiliser le coulis.
+            tx.execute(
+                "DELETE FROM recette WHERE nom = 'Pizza maison jambon-champignons'",
+                [],
+            )
+            .unwrap();
+            tx.execute("DELETE FROM ingredient WHERE nom = 'Coulis de tomate'", [])
+                .unwrap();
+            tx.execute(
+                "INSERT INTO recette (nom, categorie, vege, minutes) VALUES (?1, 'soupe', 1, 5)",
+                params![deja.to_uppercase()],
+            )
+            .unwrap();
+            tx.pragma_update(None, "user_version", 2).unwrap();
+            tx.commit().unwrap();
+        }
+
+        let cat = Catalogue::ouvrir(&chemin).unwrap();
+        // Le premier lot sans la pizza (une recette supprimée ne revient pas), la
+        // recette maison, et le lot moins la recette déjà présente sous ce nom.
+        assert_eq!(cat.recettes.len(), (premier_lot - 1) + 1 + (lot.len() - 1));
+        assert!(cat.recettes.iter().all(|r| !r.nom.starts_with("Pizza")));
+        let maison = cat
+            .recettes
+            .iter()
+            .find(|r| r.nom == deja.to_uppercase())
+            .unwrap();
+        assert_eq!(maison.minutes, 5);
+        assert!(cat.recettes.iter().all(|r| r.nom != deja));
+        for depart in &lot[1..] {
+            let lue = cat.recettes.iter().find(|r| r.nom == depart.nom).unwrap();
+            assert_eq!(lue.etapes, depart.etapes);
+            assert_eq!(lue.ingredients.len(), depart.ingredients.len());
+            for ((id, quantite), (code, attendue)) in lue.ingredients.iter().zip(depart.ingredients)
+            {
+                let i = &cat.ingredients[cat.index_ingredient(*id).unwrap()];
+                let d = &donnees::INGREDIENTS[donnees::index_ingredient(code).unwrap()];
+                assert_eq!(i.nom, d.nom);
+                assert_eq!(quantite, attendue);
+            }
+        }
+        // Le prix modifié est conservé, l'ingrédient supprimé est recréé une seule fois.
+        let prix = |nom: &str| -> Vec<f64> {
+            cat.ingredients
+                .iter()
+                .filter(|i| i.nom == nom)
+                .map(|i| i.prix)
+                .collect()
+        };
+        assert_eq!(prix("Courgettes"), vec![7.77]);
+        assert_eq!(prix("Coulis de tomate").len(), 1);
+        assert_eq!(cat.ingredients.len(), donnees::INGREDIENTS.len());
+
+        // Réouverture : rien n'est ajouté une seconde fois.
+        let recettes = cat.recettes.len();
+        drop(cat);
+        assert_eq!(Catalogue::ouvrir(&chemin).unwrap().recettes.len(), recettes);
         std::fs::remove_dir_all(dossier).unwrap();
     }
 

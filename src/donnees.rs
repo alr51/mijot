@@ -1081,6 +1081,264 @@ pub static RECETTES: &[Recette] = &[
             "Cuire à feu moyen en ramenant les bords, plier et servir avec la salade et le pain.",
         ],
     },
+    // Deuxième lot (voir `LOT_2`) : ajouté aux bases existantes par migration.
+    Recette {
+        id: "soupe_lentilles_corail",
+        nom: "Soupe de lentilles corail aux carottes",
+        categorie: Categorie::Soupe,
+        vege: true,
+        minutes: 30,
+        ingredients: &[
+            ("lentilles_corail", 70.),
+            ("carotte", 100.),
+            ("oignon", 40.),
+            ("lait_coco", 40.),
+            ("bouillon", 0.5),
+            ("cumin", 2.),
+            ("pain", 0.25),
+        ],
+        etapes: &[
+            "Faire revenir l'oignon émincé avec le cumin, puis ajouter les carottes en rondelles.",
+            "Ajouter les lentilles rincées, couvrir largement de bouillon et cuire 20 minutes.",
+            "Mixer avec le lait de coco, rectifier l'assaisonnement et servir avec le pain.",
+        ],
+    },
+    Recette {
+        id: "gratin_courgettes",
+        nom: "Gratin de courgettes",
+        categorie: Categorie::Four,
+        vege: true,
+        minutes: 40,
+        ingredients: &[
+            ("courgette", 250.),
+            ("creme", 50.),
+            ("oeuf", 0.5),
+            ("emmental", 30.),
+        ],
+        etapes: &[
+            "Couper les courgettes en rondelles et les faire revenir 10 minutes à la poêle pour leur faire rendre leur eau.",
+            "Battre les œufs avec la crème, saler et poivrer.",
+            "Ranger les courgettes dans un plat, verser l'appareil, couvrir de fromage et cuire 25 minutes à 190 °C.",
+        ],
+    },
+    Recette {
+        id: "pates_brocoli_lardons",
+        nom: "Pâtes au brocoli et aux lardons",
+        categorie: Categorie::Pates,
+        vege: false,
+        minutes: 20,
+        ingredients: &[
+            ("pates", 100.),
+            ("brocoli", 150.),
+            ("lardons", 40.),
+            ("creme", 30.),
+            ("parmesan", 10.),
+        ],
+        etapes: &[
+            "Cuire les pâtes ; ajouter le brocoli en petites fleurettes dans la casserole 4 minutes avant la fin.",
+            "Faire dorer les lardons à la poêle, puis ajouter la crème.",
+            "Égoutter les pâtes et le brocoli, les mêler aux lardons et servir avec le parmesan.",
+        ],
+    },
+    Recette {
+        id: "pommes_de_terre_lardons",
+        nom: "Pommes de terre gratinées aux lardons",
+        categorie: Categorie::Four,
+        vege: false,
+        minutes: 45,
+        ingredients: &[
+            ("pomme_de_terre", 300.),
+            ("lardons", 60.),
+            ("oignon", 50.),
+            ("creme", 30.),
+            ("emmental", 30.),
+        ],
+        etapes: &[
+            "Cuire les pommes de terre à l'eau 15 minutes, puis les couper en rondelles épaisses.",
+            "Faire revenir les lardons et l'oignon émincé.",
+            "Mélanger le tout dans un plat avec la crème, couvrir de fromage et gratiner 20 minutes à 200 °C.",
+        ],
+    },
+    Recette {
+        id: "gnocchis_tomate_mozzarella",
+        nom: "Gnocchis gratinés tomate-mozzarella",
+        categorie: Categorie::Four,
+        vege: true,
+        minutes: 20,
+        ingredients: &[
+            ("gnocchi", 180.),
+            ("coulis_tomate", 100.),
+            ("mozzarella", 60.),
+            ("herbes", 1.),
+        ],
+        etapes: &[
+            "Faire dorer les gnocchis à la poêle 5 minutes.",
+            "Les mélanger au coulis de tomate et aux herbes dans un plat.",
+            "Répartir la mozzarella en morceaux et gratiner 10 minutes à 210 °C.",
+        ],
+    },
+    Recette {
+        id: "pois_chiches_chorizo",
+        nom: "Pois chiches au chorizo et semoule",
+        categorie: Categorie::Mijote,
+        vege: false,
+        minutes: 25,
+        ingredients: &[
+            ("pois_chiches", 130.),
+            ("chorizo", 40.),
+            ("tomates_concassees", 120.),
+            ("oignon", 40.),
+            ("paprika", 2.),
+            ("semoule", 70.),
+        ],
+        etapes: &[
+            "Faire revenir le chorizo en rondelles, puis l'oignon émincé dans son gras.",
+            "Ajouter les pois chiches égouttés, les tomates et le paprika, laisser mijoter 15 minutes.",
+            "Verser sur la semoule son volume d'eau bouillante salée, couvrir 5 minutes, égrener et servir.",
+        ],
+    },
+    Recette {
+        id: "curry_chou_fleur",
+        nom: "Curry de chou-fleur et patate douce",
+        categorie: Categorie::Mijote,
+        vege: true,
+        minutes: 35,
+        ingredients: &[
+            ("chou_fleur", 150.),
+            ("patate_douce", 120.),
+            ("lait_coco", 80.),
+            ("tomates_concassees", 60.),
+            ("oignon", 40.),
+            ("curry", 3.),
+            ("riz", 70.),
+        ],
+        etapes: &[
+            "Faire revenir l'oignon émincé avec le curry.",
+            "Ajouter la patate douce en cubes et le chou-fleur en fleurettes, puis les tomates et le lait de coco.",
+            "Couvrir et laisser mijoter 20 minutes, jusqu'à ce que les légumes soient tendres.",
+            "Servir avec le riz.",
+        ],
+    },
+    Recette {
+        id: "taboule_pois_chiches",
+        nom: "Taboulé aux pois chiches et à la feta",
+        categorie: Categorie::Express,
+        vege: true,
+        minutes: 15,
+        ingredients: &[
+            ("semoule", 70.),
+            ("pois_chiches", 60.),
+            ("tomate", 100.),
+            ("concombre", 0.25),
+            ("feta", 40.),
+            ("citron", 0.5),
+            ("huile_olive", 10.),
+        ],
+        etapes: &[
+            "Verser sur la semoule son volume d'eau bouillante salée, couvrir 5 minutes puis égrener.",
+            "Ajouter les tomates et le concombre en petits dés, les pois chiches égouttés et la feta émiettée.",
+            "Assaisonner de jus de citron et d'huile d'olive ; servir frais.",
+        ],
+    },
+    Recette {
+        id: "poulet_moutarde",
+        nom: "Poulet à la moutarde et riz",
+        categorie: Categorie::Riz,
+        vege: false,
+        minutes: 30,
+        ingredients: &[
+            ("poulet", 120.),
+            ("moutarde", 10.),
+            ("creme", 50.),
+            ("oignon", 30.),
+            ("riz", 75.),
+        ],
+        etapes: &[
+            "Faire dorer le poulet en morceaux, le réserver.",
+            "Faire fondre l'oignon émincé dans la même poêle, ajouter la moutarde et la crème.",
+            "Remettre le poulet et laisser mijoter 10 minutes ; servir avec le riz.",
+        ],
+    },
+    Recette {
+        id: "wraps_thon",
+        nom: "Wraps au thon et crudités",
+        categorie: Categorie::Express,
+        vege: false,
+        minutes: 10,
+        ingredients: &[
+            ("tortilla", 2.),
+            ("thon", 60.),
+            ("salade", 0.25),
+            ("tomate", 80.),
+            ("mais", 30.),
+            ("yaourt", 0.5),
+        ],
+        etapes: &[
+            "Mélanger le thon émietté avec le yaourt, saler et poivrer.",
+            "Garnir les tortillas de salade, de tomates en dés, de maïs et de thon.",
+            "Rouler serré et couper en deux.",
+        ],
+    },
+    Recette {
+        id: "aubergines_parmigiana",
+        nom: "Aubergines gratinées à la parmigiana",
+        categorie: Categorie::Four,
+        vege: true,
+        minutes: 45,
+        ingredients: &[
+            ("aubergine", 250.),
+            ("tomates_concassees", 150.),
+            ("mozzarella", 60.),
+            ("parmesan", 15.),
+            ("ail", 0.5),
+            ("huile_olive", 10.),
+            ("pain", 0.25),
+        ],
+        etapes: &[
+            "Couper les aubergines en tranches, les huiler et les dorer 15 minutes au four à 200 °C.",
+            "Faire réduire les tomates avec l'ail une dizaine de minutes.",
+            "Alterner dans un plat les aubergines, la sauce et la mozzarella ; finir par le parmesan.",
+            "Gratiner 20 minutes à 190 °C et servir avec le pain.",
+        ],
+    },
+    Recette {
+        id: "colin_papillote",
+        nom: "Colin en papillote aux légumes",
+        categorie: Categorie::Poisson,
+        vege: false,
+        minutes: 30,
+        ingredients: &[
+            ("colin", 130.),
+            ("courgette", 100.),
+            ("carotte", 60.),
+            ("citron", 0.25),
+            ("huile_olive", 8.),
+            ("semoule", 70.),
+        ],
+        etapes: &[
+            "Tailler les courgettes et les carottes en fins bâtonnets.",
+            "Les répartir sur des feuilles de papier cuisson, poser le colin, arroser d'huile et de jus de citron, puis refermer.",
+            "Cuire 18 minutes à 200 °C.",
+            "Préparer la semoule et servir avec les papillotes.",
+        ],
+    },
+];
+
+/// Recettes ajoutées au catalogue de départ après la première version. Une
+/// base créée avant ne les a pas reçues : une migration les lui ajoute.
+pub static LOT_2: &[&str] = &[
+    "soupe_lentilles_corail",
+    "gratin_courgettes",
+    "pates_brocoli_lardons",
+    "pommes_de_terre_lardons",
+    "gnocchis_tomate_mozzarella",
+    "pois_chiches_chorizo",
+    "curry_chou_fleur",
+    "taboule_pois_chiches",
+    "poulet_moutarde",
+    "wraps_thon",
+    "aubergines_parmigiana",
+    "colin_papillote",
 ];
 
 /// Position d'un ingrédient dans [`INGREDIENTS`].
@@ -1131,6 +1389,18 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn lot_2_dans_le_catalogue() {
+        for id in LOT_2 {
+            assert!(index_recette(id).is_some(), "{id} absente du catalogue");
+        }
+        // Le lot est la fin du catalogue : l'ordre d'une base neuve et celui
+        // d'une base migrée sont les mêmes.
+        let debut = RECETTES.len() - LOT_2.len();
+        let fin: Vec<&str> = RECETTES[debut..].iter().map(|r| r.id).collect();
+        assert_eq!(fin, LOT_2);
     }
 
     #[test]
