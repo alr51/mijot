@@ -9,7 +9,7 @@ réseau ne sert qu'à suggérer un prix, sur demande.
   ou retiré.
 - **Liste de courses** : ingrédients cumulés de tous les repas, par rayon, avec prix
   estimés, cases à cocher, articles ajoutés à la main et copie dans le presse-papiers.
-- **Recettes** : le catalogue (117 recettes au départ), avec recherche (nom, origine, catégorie
+- **Recettes** : le catalogue (209 recettes au départ), avec recherche (nom, origine, catégorie
   ou ingrédient), quantités à l'échelle et étapes. Chaque recette peut être modifiée
   ou supprimée, et tu peux créer les tiennes.
 - **Ingrédients et prix** : le prix de chaque ingrédient se modifie sur place

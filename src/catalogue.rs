@@ -12,7 +12,7 @@ use rusqlite::{Connection, OptionalExtension as _, params};
 use crate::donnees::{self, Categorie, Rayon, Unite};
 
 /// Version du schéma, tenue dans `PRAGMA user_version`.
-const VERSION: i64 = 6;
+const VERSION: i64 = 7;
 
 /// Amène la base de la version `vers - 1` à la version `vers`.
 fn migrer(base: &Connection, vers: i64) -> Result<(), Erreur> {
@@ -35,6 +35,21 @@ fn migrer(base: &Connection, vers: i64) -> Result<(), Erreur> {
             for r in donnees::RECETTES.iter().filter(|r| !r.origine.is_empty()) {
                 base.execute(
                     "UPDATE recette SET origine = ?1 WHERE nom = ?2 COLLATE NOCASE",
+                    params![r.origine, r.nom],
+                )?;
+            }
+        }
+        // Cinquième lot : plats plus élaborés. La colonne `origine` existe
+        // désormais, mais `ajouter_lot` ne la remplit pas.
+        7 => {
+            ajouter_lot(base, donnees::LOT_5)?;
+            for r in donnees::RECETTES
+                .iter()
+                .filter(|r| donnees::LOT_5.contains(&r.id))
+            {
+                base.execute(
+                    "UPDATE recette SET origine = ?1
+                     WHERE nom = ?2 COLLATE NOCASE AND origine = ''",
                     params![r.origine, r.nom],
                 )?;
             }
@@ -699,9 +714,14 @@ mod tests {
         let lot: Vec<&donnees::Recette> = donnees::RECETTES
             .iter()
             .filter(|r| {
-                [donnees::LOT_2, donnees::LOT_3, donnees::LOT_4]
-                    .iter()
-                    .any(|lot| lot.contains(&r.id))
+                [
+                    donnees::LOT_2,
+                    donnees::LOT_3,
+                    donnees::LOT_4,
+                    donnees::LOT_5,
+                ]
+                .iter()
+                .any(|lot| lot.contains(&r.id))
             })
             .collect();
         let premier_lot = donnees::RECETTES.len() - lot.len();
