@@ -1,8 +1,11 @@
-//! Identité visuelle : palette chaleureuse (crème et terracotta), pictogrammes
-//! des catégories et des rayons, briques de mise en page communes aux écrans.
+//! Identité visuelle : palette sobre (gris neutres, un seul accent terracotta),
+//! profondeur par ombres légères, pictogrammes des catégories et des rayons,
+//! briques de mise en page communes aux écrans.
 
 use gpui_kit::assets::IconName;
-use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, Size, Theme, ThemeColor, v_flex};
+use gpui_kit::component::{
+    ActiveTheme as _, Icon, Sizable as _, Size, Theme, ThemeColor, h_flex, v_flex,
+};
 use gpui_kit::*;
 
 use crate::donnees::{Categorie, Rayon};
@@ -15,9 +18,9 @@ fn couleur(teinte: f32, saturation: f32, luminosite: f32) -> Hsla {
 /// Fond et couleur principale de la palette, selon le mode du thème.
 fn reperes(sombre: bool) -> (Hsla, Hsla) {
     if sombre {
-        (couleur(24., 10., 9.5), couleur(18., 85., 60.))
+        (couleur(230., 8., 10.), couleur(14., 92., 63.))
     } else {
-        (couleur(40., 40., 97.5), couleur(16., 78., 50.))
+        (couleur(0., 0., 100.), couleur(14., 84., 52.))
     }
 }
 
@@ -43,8 +46,8 @@ pub fn appliquer_palette(cx: &mut App) {
     // `Theme::update` garde en phase les couleurs, les jetons que lisent les
     // composants (boutons…) et rafraîchit les fenêtres.
     Theme::update(cx, |theme| {
-        theme.radius = px(8.);
-        theme.radius_lg = px(14.);
+        theme.radius = px(10.);
+        theme.radius_lg = px(16.);
         peindre(&mut theme.colors, sombre, fond, primaire);
     });
 }
@@ -60,35 +63,40 @@ fn peindre(c: &mut ThemeColor, sombre: bool, fond: Hsla, primaire: Hsla) {
     c.selection = primaire.opacity(0.25);
     c.list_active = primaire.opacity(0.12);
     if sombre {
-        c.foreground = couleur(35., 25., 92.);
-        c.muted = couleur(24., 8., 16.);
-        c.muted_foreground = couleur(30., 10., 64.);
-        c.border = couleur(24., 8., 21.);
-        c.input = couleur(24., 8., 27.);
-        c.group_box = couleur(24., 9., 13.5);
-        c.primary_hover = couleur(18., 85., 65.);
-        c.primary_active = couleur(18., 85., 55.);
-        c.primary_foreground = couleur(24., 30., 8.);
-        c.accent = couleur(22., 22., 19.);
-        c.secondary = couleur(24., 8., 18.);
-        c.secondary_hover = couleur(24., 8., 21.);
-        c.secondary_active = couleur(24., 8., 24.);
-        c.sidebar = couleur(24., 11., 7.5);
+        // Gris froids très sombres, trois paliers nets : fenêtre, feuille, carte.
+        c.foreground = couleur(220., 14., 94.);
+        c.muted = couleur(230., 8., 17.);
+        c.muted_foreground = couleur(225., 8., 64.);
+        c.border = couleur(230., 8., 20.);
+        c.input = couleur(230., 8., 28.);
+        c.group_box = couleur(230., 8., 13.5);
+        c.primary_hover = couleur(14., 92., 68.);
+        c.primary_active = couleur(14., 92., 58.);
+        c.primary_foreground = couleur(230., 20., 8.);
+        c.accent = couleur(230., 8., 19.);
+        c.secondary = couleur(230., 8., 18.);
+        c.secondary_hover = couleur(230., 8., 21.5);
+        c.secondary_active = couleur(230., 8., 25.);
+        c.sidebar = couleur(230., 10., 6.5);
+        c.success = couleur(152., 60., 52.);
+        c.danger = couleur(2., 85., 66.);
     } else {
-        c.foreground = couleur(25., 25., 14.);
-        c.muted = couleur(38., 30., 93.);
-        c.muted_foreground = couleur(28., 10., 40.);
-        c.border = couleur(35., 25., 87.);
-        c.input = couleur(35., 22., 80.);
+        c.foreground = couleur(225., 15., 13.);
+        c.muted = couleur(220., 14., 96.);
+        c.muted_foreground = couleur(220., 8., 43.);
+        c.border = couleur(220., 13., 91.);
+        c.input = couleur(220., 12., 84.);
         c.group_box = couleur(0., 0., 100.);
-        c.primary_hover = couleur(16., 78., 45.);
-        c.primary_active = couleur(16., 78., 41.);
+        c.primary_hover = couleur(14., 84., 47.);
+        c.primary_active = couleur(14., 84., 43.);
         c.primary_foreground = couleur(0., 0., 100.);
-        c.accent = couleur(26., 75., 93.);
-        c.secondary = couleur(36., 35., 92.);
-        c.secondary_hover = couleur(36., 35., 89.);
-        c.secondary_active = couleur(36., 35., 86.);
-        c.sidebar = couleur(38., 38., 95.);
+        c.accent = couleur(220., 14., 94.);
+        c.secondary = couleur(220., 14., 95.);
+        c.secondary_hover = couleur(220., 14., 92.);
+        c.secondary_active = couleur(220., 14., 89.);
+        c.sidebar = couleur(220., 16., 95.);
+        c.success = couleur(152., 62., 36.);
+        c.danger = couleur(2., 72., 50.);
     }
     c.accent_foreground = c.foreground;
     c.secondary_foreground = c.foreground;
@@ -128,7 +136,7 @@ pub(super) fn visuel_rayon(rayon: Rayon) -> (IconName, f32) {
 fn tons(teinte: f32, cx: &App) -> (Hsla, Hsla) {
     let h = teinte / 360.;
     if cx.theme().is_dark() {
-        (hsla(h, 0.55, 0.55, 0.20), hsla(h, 0.70, 0.72, 1.))
+        (hsla(h, 0.70, 0.60, 0.18), hsla(h, 0.80, 0.76, 1.))
     } else {
         (hsla(h, 0.75, 0.50, 0.13), hsla(h, 0.70, 0.36, 1.))
     }
@@ -152,7 +160,38 @@ pub(super) fn pastille(icone: IconName, teinte: f32, cote: f32, cx: &App) -> Div
         )
 }
 
-/// Carte : fond clair, bordure fine, coins arrondis.
+/// Dégradé en diagonale d'une teinte : bandeau des cartes de repas.
+pub(super) fn degrade(teinte: f32, cx: &App) -> Background {
+    let (h, h2) = (teinte / 360., ((teinte + 16.) % 360.) / 360.);
+    // En sombre : une lueur de la teinte qui s'éteint dans le fond de la carte,
+    // plutôt qu'un aplat foncé. En clair : un pastel léger.
+    let (debut, fin) = if cx.theme().is_dark() {
+        (hsla(h, 0.80, 0.60, 0.30), hsla(h, 0.80, 0.60, 0.05))
+    } else {
+        (hsla(h, 0.80, 0.95, 1.), hsla(h2, 0.75, 0.90, 1.))
+    };
+    linear_gradient(
+        135.,
+        linear_color_stop(debut, 0.),
+        linear_color_stop(fin, 1.),
+    )
+}
+
+/// Couleur de trait d'une teinte, lisible sur son dégradé ou son fond teinté.
+pub(super) fn trait_teinte(teinte: f32, cx: &App) -> Hsla {
+    tons(teinte, cx).1
+}
+
+/// Ombre douce et diffuse, posée sous les surfaces flottantes.
+pub(super) fn ombre(cx: &App) -> Vec<BoxShadow> {
+    let force = if cx.theme().is_dark() { 0.35 } else { 0.06 };
+    vec![
+        BoxShadow::new(px(0.), px(1.), hsla(0., 0., 0., force)).blur_radius(px(2.)),
+        BoxShadow::new(px(0.), px(6.), hsla(0., 0., 0., force * 0.7)).blur_radius(px(18.)),
+    ]
+}
+
+/// Carte : fond clair, bordure à peine visible, grands coins arrondis.
 pub(super) fn carte(cx: &App) -> Div {
     let theme = cx.theme();
     v_flex()
@@ -161,6 +200,60 @@ pub(super) fn carte(cx: &App) -> Div {
         .border_1()
         .border_color(theme.border)
         .bg(theme.group_box)
+}
+
+/// Feuille : grande surface flottante posée sur le fond de la fenêtre. Elle
+/// porte le contenu de la page ou un volet.
+pub(super) fn feuille(cx: &App) -> Div {
+    let theme = cx.theme();
+    v_flex()
+        .rounded(px(18.))
+        .border_1()
+        .border_color(theme.border)
+        .bg(theme.background)
+        .shadow(ombre(cx))
+}
+
+/// Bandeau sans bordure, sur fond discret : réglages, barres d'outils.
+pub(super) fn bandeau(cx: &App) -> Div {
+    let theme = cx.theme();
+    h_flex()
+        .px_4()
+        .py_3()
+        .rounded(theme.radius_lg)
+        .bg(theme.muted)
+}
+
+/// Pilule d'état : un point de couleur et un libellé court.
+pub(super) fn pilule(texte: impl Into<SharedString>, couleur: Hsla) -> Div {
+    h_flex()
+        .flex_shrink_0()
+        .gap_1p5()
+        .px_2p5()
+        .py_0p5()
+        .rounded_full()
+        .bg(couleur.opacity(0.12))
+        .text_xs()
+        .font_weight(FontWeight::SEMIBOLD)
+        .text_color(couleur)
+        .child(div().size(px(6.)).rounded_full().bg(couleur))
+        .child(texte.into())
+}
+
+/// Jauge épaisse aux bouts ronds, remplie à `part` pour cent.
+pub(super) fn jauge(part: f32, couleur: Hsla, cx: &App) -> Div {
+    div()
+        .h(px(8.))
+        .w_full()
+        .rounded_full()
+        .bg(cx.theme().muted)
+        .child(
+            div()
+                .h_full()
+                .w(relative(part.clamp(0., 100.) / 100.))
+                .rounded_full()
+                .bg(couleur),
+        )
 }
 
 /// Titre de page et phrase d'accompagnement.
@@ -175,8 +268,9 @@ pub(super) fn entete(
         .gap_1()
         .child(
             div()
-                .text_2xl()
-                .font_weight(FontWeight::SEMIBOLD)
+                .text_size(px(28.))
+                .line_height(px(34.))
+                .font_weight(FontWeight::BOLD)
                 .child(titre.into()),
         )
         .child(
@@ -220,17 +314,13 @@ pub(super) fn etat_vide(
         )
 }
 
-/// Volet de droite : colonne défilante, sur le même fond que la barre latérale.
+/// Volet de droite : feuille défilante, à côté de celle du contenu.
 pub(super) fn volet(id: &'static str, largeur: f32, cx: &App) -> Stateful<Div> {
-    let theme = cx.theme();
-    v_flex()
+    feuille(cx)
         .id(id)
         .w(px(largeur))
         .flex_shrink_0()
         .overflow_y_scroll()
-        .bg(theme.sidebar)
-        .border_l_1()
-        .border_color(theme.border)
         .p_5()
         .gap_4()
 }
@@ -283,12 +373,21 @@ pub(super) fn tuile(
     valeur: impl Into<SharedString>,
     cx: &App,
 ) -> Div {
-    carte(cx)
+    v_flex()
         .flex_1()
         .min_w_0()
-        .p_3()
+        .px_3()
+        .py_2p5()
+        .gap_0p5()
+        .rounded(cx.theme().radius)
+        .bg(cx.theme().muted)
         .child(titre_section(libelle, cx))
-        .child(div().font_weight(FontWeight::SEMIBOLD).child(valeur.into()))
+        .child(
+            div()
+                .text_lg()
+                .font_weight(FontWeight::SEMIBOLD)
+                .child(valeur.into()),
+        )
 }
 
 /// Numéro d'étape dans un rond teinté.

@@ -53,6 +53,12 @@ enum Compteur {
     Repas,
 }
 
+/// Largeur de la barre latérale, en pixels.
+const LARGEUR_NAVIGATION: f32 = 232.;
+
+/// Marge intérieure horizontale de la feuille du contenu, en pixels.
+const MARGE_FEUILLE: f32 = 36.;
+
 const JOURS: [&str; 7] = [
     "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche",
 ];
@@ -424,11 +430,13 @@ impl Mijot {
         cx: &App,
     ) -> Stateful<Div> {
         let theme = cx.theme();
-        let (primaire, sur_primaire, survol, rayon) = (
+        let (primaire, survol, rayon, surface, bordure, discret) = (
             theme.primary,
-            theme.primary_foreground,
-            theme.accent,
+            theme.foreground.opacity(0.05),
             theme.radius,
+            theme.group_box,
+            theme.border,
+            theme.muted_foreground,
         );
         h_flex()
             .id(id)
@@ -438,23 +446,34 @@ impl Mijot {
             .rounded(rayon)
             .text_sm()
             .cursor_pointer()
+            .border_1()
+            .border_color(gpui_kit::transparent_black())
             .when(active, |ligne| {
                 ligne
-                    .bg(primaire.opacity(0.12))
-                    .text_color(primaire)
+                    .bg(surface)
+                    .border_color(bordure)
+                    .shadow(style::ombre(cx))
                     .font_weight(FontWeight::SEMIBOLD)
             })
-            .when(!active, |ligne| ligne.hover(move |ligne| ligne.bg(survol)))
-            .child(Icon::new(icone).small())
+            .when(!active, |ligne| {
+                ligne
+                    .text_color(discret)
+                    .hover(move |ligne| ligne.bg(survol))
+            })
+            .child(
+                Icon::new(icone)
+                    .small()
+                    .when(active, |icone| icone.text_color(primaire)),
+            )
             .child(div().flex_1().min_w_0().child(libelle))
             .children(compte.filter(|n| *n > 0).map(|n| {
                 div()
                     .px_2()
                     .rounded_full()
-                    .bg(primaire)
+                    .bg(primaire.opacity(0.14))
                     .text_xs()
                     .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(sur_primaire)
+                    .text_color(primaire)
                     .child(n.to_string())
             }))
     }
@@ -462,23 +481,24 @@ impl Mijot {
     /// Barre latérale : nom de l'application, pages, bascule clair/sombre.
     fn navigation(&self, cx: &mut Context<Self>) -> Div {
         let theme = cx.theme();
-        let (discret, bordure, fond, primaire, sur_primaire, sombre) = (
+        let (discret, primaire, sur_primaire, sombre) = (
             theme.muted_foreground,
-            theme.border,
-            theme.sidebar,
             theme.primary,
             theme.primary_foreground,
             theme.is_dark(),
         );
+        // Le logo reprend l'accent, en dégradé vers un orange plus chaud.
+        let logo = linear_gradient(
+            145.,
+            linear_color_stop(hsla(32. / 360., 0.95, 0.58, 1.), 0.),
+            linear_color_stop(primaire, 1.),
+        );
         let restants = self.articles_restants();
         let mut barre = v_flex()
-            .w(px(224.))
+            .w(px(LARGEUR_NAVIGATION))
             .flex_shrink_0()
             .gap_1()
             .p_3()
-            .bg(fond)
-            .border_r_1()
-            .border_color(bordure)
             .child(
                 h_flex()
                     .gap_3()
@@ -492,8 +512,9 @@ impl Mijot {
                             .items_center()
                             .justify_center()
                             .size(px(38.))
-                            .rounded(px(11.))
-                            .bg(primaire)
+                            .rounded(px(12.))
+                            .bg(logo)
+                            .shadow(style::ombre(cx))
                             .child(
                                 Icon::new(IconName::ChefHat)
                                     .with_size(Size::Size(px(22.)))
@@ -551,7 +572,6 @@ impl Mijot {
                 false,
                 cx,
             )
-            .text_color(discret)
             .on_click(cx.listener(|_, _, window, cx| {
                 let mode = if cx.theme().is_dark() {
                     ThemeMode::Light
@@ -587,14 +607,36 @@ impl Mijot {
 }
 
 impl Render for Mijot {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         // Thème rechargé hors de l'application (bascule clair/sombre du système) :
         // la palette est reposée, ce qui redessine la fenêtre.
         if !style::palette_en_place(cx) {
             cx.defer(appliquer_palette);
         }
+        // Volet de droite : la recette ouverte ou en cours de modification à côté
+        // du menu et des recettes, la suggestion de prix à côté des prix.
+        let volet = match self.onglet {
+            Onglet::Menu | Onglet::Recettes => self.volet(cx),
+            Onglet::Prix => self.volet_suggestion(cx),
+            Onglet::Courses => None,
+        };
+        // Colonnes de la grille des repas : ce qui tient dans la feuille du
+        // contenu, une fois retirés la barre latérale, le volet et les marges.
+        let largeur_volet = if volet.is_none() {
+            0.
+        } else if self.editeur.is_some() {
+            468.
+        } else {
+            408.
+        };
+        let utile = f32::from(window.viewport_size().width)
+            - LARGEUR_NAVIGATION
+            - largeur_volet
+            - 2. * MARGE_FEUILLE
+            - 8.;
+        let colonnes = (((utile + 16.) / 276.) as u16).clamp(1, 4);
         let page = match self.onglet {
-            Onglet::Menu => self.page_menu(cx),
+            Onglet::Menu => self.page_menu(colonnes, cx),
             Onglet::Courses => self.page_courses(cx),
             Onglet::Recettes => self.page_recettes(cx),
             Onglet::Prix => self.page_prix(cx),
@@ -606,33 +648,37 @@ impl Render for Mijot {
                 Alert::warning("avis", texte.clone())
             }
         });
-        // Volet de droite : la recette ouverte ou en cours de modification à côté
-        // du menu et des recettes, la suggestion de prix à côté des prix.
-        let volet = match self.onglet {
-            Onglet::Menu | Onglet::Recettes => self.volet(cx),
-            Onglet::Prix => self.volet_suggestion(cx),
-            Onglet::Courses => None,
-        };
         let theme = cx.theme();
+        // Le fond de la fenêtre est celui de la barre latérale ; le contenu et
+        // le volet y sont posés comme deux feuilles flottantes.
         div()
             .flex()
             .size_full()
-            .bg(theme.background)
+            .bg(theme.sidebar)
             .text_color(theme.foreground)
             .child(self.navigation(cx))
             .child(
-                v_flex()
-                    .id("contenu")
+                div()
+                    .flex()
                     .flex_1()
                     .min_w_0()
-                    .overflow_y_scroll()
-                    .px_8()
-                    .py_6()
-                    .gap_4()
-                    .children(avis)
-                    .child(page),
+                    .gap_2()
+                    .py_2()
+                    .pr_2()
+                    .child(
+                        style::feuille(cx)
+                            .id("contenu")
+                            .flex_1()
+                            .min_w_0()
+                            .overflow_y_scroll()
+                            .px(px(MARGE_FEUILLE))
+                            .py_7()
+                            .gap_4()
+                            .children(avis)
+                            .child(page),
+                    )
+                    .children(volet),
             )
-            .children(volet)
     }
 }
 
