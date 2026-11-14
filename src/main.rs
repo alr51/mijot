@@ -14,6 +14,7 @@
 mod catalogue;
 mod donnees;
 mod etat;
+mod nutrition;
 mod plan;
 mod prix_ouverts;
 mod ui;

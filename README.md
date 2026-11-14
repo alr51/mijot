@@ -12,6 +12,8 @@ réseau ne sert qu'à suggérer un prix, sur demande.
 - **Recettes** : le catalogue (209 recettes au départ), avec recherche (nom, origine, catégorie
   ou ingrédient), quantités à l'échelle et étapes. Chaque recette peut être modifiée
   ou supprimée, et tu peux créer les tiennes.
+- **Nutrition** : pour chaque recette, les apports par personne (calories, glucides,
+  protéines, lipides, sucres, graisses saturées, fibres, sel) et un Nutri-Score estimé.
 - **Ingrédients et prix** : le prix de chaque ingrédient se modifie sur place
   (enregistré dès la saisie) ; ajout d'ingrédients, suppression de ceux qu'aucune
   recette n'utilise. « Suggérer » propose un prix d'après les relevés
@@ -37,6 +39,7 @@ cargo test    # catalogue SQLite, planificateur, liste de courses, état, lectur
 | `src/donnees.rs`      | Catalogue de départ, copié dans la base à sa création               |
 | `src/catalogue.rs`    | Catalogue modifiable : schéma SQLite, lecture, écritures validées   |
 | `src/plan.rs`         | Coûts, composition d'un menu dans le budget, liste de courses       |
+| `src/nutrition.rs`    | Valeurs nutritionnelles des ingrédients, apports, Nutri-Score       |
 | `src/prix_ouverts.rs` | Suggestions de prix : appels à Open Prices, calcul de la médiane    |
 | `src/etat.rs`         | État de l'interface (budget, menu, cases cochées), en JSON          |
 | `src/ui.rs`           | Fenêtre : état, actions, barre latérale                             |
@@ -58,6 +61,20 @@ Tout est dans `~/.local/share/mijot/` :
 
 Si la base est illisible, l'application démarre sur le catalogue de départ en
 mémoire et le signale : les modifications ne sont alors pas conservées.
+
+## Nutrition
+
+Les apports sont calculés d'après des valeurs moyennes pour 100 g de chaque
+ingrédient du catalogue de départ (`src/nutrition.rs`). Le Nutri-Score suit
+l'algorithme de 2023 pour les aliments généraux, appliqué à 100 g de plat cuisiné.
+
+C'est une estimation, pas un étiquetage :
+
+- le sel ajouté « à vue » n'est pas compté, pas plus que les pertes à la cuisson ;
+- l'eau absorbée par les pâtes, le riz ou les légumes secs est estimée, comme celle
+  des soupes ;
+- un ingrédient créé dans l'application n'a pas de valeurs : les recettes qui
+  l'utilisent sont signalées comme incomplètes.
 
 ## Suggestions de prix
 

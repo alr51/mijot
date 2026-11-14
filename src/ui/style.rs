@@ -6,9 +6,11 @@ use gpui_kit::assets::IconName;
 use gpui_kit::component::{
     ActiveTheme as _, Icon, Sizable as _, Size, Theme, ThemeColor, h_flex, v_flex,
 };
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::donnees::{Categorie, Rayon};
+use crate::nutrition::Score;
 
 /// Couleur opaque : teinte en degrés, saturation et luminosité en pour cent.
 fn couleur(teinte: f32, saturation: f32, luminosite: f32) -> Hsla {
@@ -240,6 +242,67 @@ pub(super) fn pilule(texte: impl Into<SharedString>, couleur: Hsla) -> Div {
         .child(texte.into())
 }
 
+/// Couleur officielle d'une classe du Nutri-Score, et couleur de sa lettre.
+fn couleurs_score(score: Score) -> (Hsla, Hsla) {
+    let blanc = couleur(0., 0., 100.);
+    match score {
+        Score::A => (couleur(149., 95., 26.), blanc),
+        Score::B => (couleur(83., 60., 42.), blanc),
+        // Le jaune ne porte pas de lettre blanche lisible.
+        Score::C => (couleur(48., 99., 50.), couleur(40., 60., 16.)),
+        Score::D => (couleur(33., 100., 47.), blanc),
+        Score::E => (couleur(13., 86., 48.), blanc),
+    }
+}
+
+/// Lettre du Nutri-Score dans un petit carré de sa couleur.
+pub(super) fn pastille_score(score: Score) -> Div {
+    let (fond, lettre) = couleurs_score(score);
+    div()
+        .flex()
+        .flex_shrink_0()
+        .items_center()
+        .justify_center()
+        .size(px(20.))
+        .rounded(px(6.))
+        .bg(fond)
+        .text_xs()
+        .font_weight(FontWeight::BOLD)
+        .text_color(lettre)
+        .child(score.lettre())
+}
+
+/// Échelle du Nutri-Score : les cinq classes, celle de la recette mise en avant.
+pub(super) fn echelle_score(score: Score) -> Div {
+    let mut echelle = h_flex().flex_shrink_0();
+    for classe in Score::TOUS {
+        let (fond, lettre) = couleurs_score(classe);
+        let case = div()
+            .flex()
+            .items_center()
+            .justify_center()
+            .font_weight(FontWeight::BOLD);
+        echelle = echelle.child(if classe == score {
+            case.size(px(36.))
+                .rounded(px(10.))
+                .bg(fond)
+                .text_lg()
+                .text_color(lettre)
+                .child(classe.lettre())
+        } else {
+            case.w(px(26.))
+                .h(px(24.))
+                .when(classe == Score::A, |case| case.rounded_l(px(7.)))
+                .when(classe == Score::E, |case| case.rounded_r(px(7.)))
+                .bg(fond.opacity(0.28))
+                .text_xs()
+                .text_color(fond)
+                .child(classe.lettre())
+        });
+    }
+    echelle
+}
+
 /// Jauge épaisse aux bouts ronds, remplie à `part` pour cent.
 pub(super) fn jauge(part: f32, couleur: Hsla, cx: &App) -> Div {
     div()
@@ -381,7 +444,7 @@ pub(super) fn tuile(
         .gap_0p5()
         .rounded(cx.theme().radius)
         .bg(cx.theme().muted)
-        .child(titre_section(libelle, cx))
+        .child(titre_section(libelle, cx).whitespace_nowrap())
         .child(
             div()
                 .text_lg()

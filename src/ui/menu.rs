@@ -13,10 +13,11 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use super::style::{
-    bandeau, carte, degrade, entete, etat_vide, jauge, ombre, pilule, trait_teinte, tuile,
-    visuel_categorie,
+    bandeau, carte, degrade, entete, etat_vide, jauge, ombre, pastille_score, pilule, trait_teinte,
+    tuile, visuel_categorie,
 };
 use super::{Compteur, Mijot, libelle_repas};
+use crate::nutrition;
 use crate::plan::{cout_menu, cout_par_personne, euros};
 
 impl Mijot {
@@ -171,12 +172,17 @@ impl Mijot {
                 )
                 .child(
                     h_flex()
-                        .w(px(400.))
+                        .w(px(440.))
                         .max_w_full()
                         .gap_2()
                         .child(tuile(libelle_ecart, ecart, cx))
                         .child(tuile("Par assiette", euros(cout / portions), cx))
-                        .child(tuile("Repas", menu.len().to_string(), cx)),
+                        .child(tuile(
+                            "Énergie par assiette",
+                            nutrition::moyenne_menu(&self.cat, menu)
+                                .map_or("—".to_owned(), |moyenne| nutrition::kcal(moyenne.kcal)),
+                            cx,
+                        )),
                 ),
         )
     }
@@ -209,7 +215,12 @@ impl Mijot {
             precisions.push(r.origine.clone());
         }
         precisions.push(format!("{} min", r.minutes));
-        precisions.push(r.categorie.nom().to_owned());
+        // La catégorie se lit déjà dans le bandeau : place à l'énergie.
+        let bilan = nutrition::bilan(&self.cat, recette);
+        match &bilan {
+            Some(bilan) => precisions.push(nutrition::kcal(bilan.par_personne.kcal)),
+            None => precisions.push(r.categorie.nom().to_owned()),
+        }
         v_flex()
             .id(("carte", position))
             .min_w_0()
@@ -220,10 +231,7 @@ impl Mijot {
             .cursor_pointer()
             .when(ouverte, |c| c.border_color(primaire).shadow(ombre(cx)))
             .when(!ouverte, |c| {
-                c.hover(move |c| {
-                    c.border_color(primaire.opacity(0.45))
-                        .shadow(ombre_survol)
-                })
+                c.hover(move |c| c.border_color(primaire.opacity(0.45)).shadow(ombre_survol))
             })
             .on_click(cx.listener(move |this, _, _, cx| {
                 this.detail = Some(id);
@@ -238,15 +246,20 @@ impl Mijot {
                     .rounded_t(rayon - px(1.))
                     .bg(degrade(teinte, cx))
                     .child(
-                        div()
-                            .px_2p5()
-                            .py_0p5()
-                            .rounded_full()
-                            .bg(surface.opacity(0.75))
-                            .text_xs()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(trait_)
-                            .child(libelle_repas(position, total)),
+                        h_flex()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .px_2p5()
+                                    .py_0p5()
+                                    .rounded_full()
+                                    .bg(surface.opacity(0.75))
+                                    .text_xs()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(trait_)
+                                    .child(libelle_repas(position, total)),
+                            )
+                            .children(bilan.map(|bilan| pastille_score(bilan.score))),
                     )
                     .child(
                         Icon::new(icone)
@@ -273,12 +286,7 @@ impl Mijot {
                             .gap_2()
                             .text_xs()
                             .text_color(discret)
-                            .child(
-                                div()
-                                    .min_w_0()
-                                    .truncate()
-                                    .child(precisions.join(" · ")),
-                            )
+                            .child(div().min_w_0().truncate().child(precisions.join(" · ")))
                             .when(r.vege, |ligne| {
                                 ligne.child(pilule("Végé", cx.theme().success))
                             }),
@@ -290,14 +298,9 @@ impl Mijot {
                             .pt_3()
                             .child(
                                 v_flex()
-                                    .child(
-                                        div()
-                                            .text_lg()
-                                            .font_weight(FontWeight::SEMIBOLD)
-                                            .child(euros(
-                                                par_personne * f64::from(self.etat.personnes),
-                                            )),
-                                    )
+                                    .child(div().text_lg().font_weight(FontWeight::SEMIBOLD).child(
+                                        euros(par_personne * f64::from(self.etat.personnes)),
+                                    ))
                                     .child(
                                         div()
                                             .text_xs()

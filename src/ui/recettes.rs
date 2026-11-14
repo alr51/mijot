@@ -17,12 +17,13 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use super::style::{
-    carte, entete, entete_volet, etat_vide, numero, pastille, titre_section, tuile,
-    visuel_categorie, volet,
+    carte, echelle_score, entete, entete_volet, etat_vide, numero, pastille, pastille_score,
+    titre_section, tuile, visuel_categorie, volet,
 };
 use super::{Liste, Mijot, ecrire_nombre, lire_nombre, liste, quantite_recette, selecteur};
 use crate::catalogue::{Catalogue, Recette};
 use crate::donnees::Categorie;
+use crate::nutrition::{self, grammes};
 use crate::plan::{REPAS_MAX, cout_par_personne, euros};
 
 /// Formulaire d'une recette. Rien n'est écrit en base avant « Enregistrer ».
@@ -373,14 +374,19 @@ impl Mijot {
                             ),
                     )
                     .child(
-                        div()
+                        h_flex()
                             .flex_shrink_0()
+                            .gap_3()
                             .text_sm()
                             .text_color(discret)
                             .child(format!(
                                 "{} / pers.",
                                 euros(cout_par_personne(&self.cat, r))
-                            )),
+                            ))
+                            .children(
+                                nutrition::bilan(&self.cat, r)
+                                    .map(|bilan| pastille_score(bilan.score)),
+                            ),
                     ),
             );
         }
@@ -430,8 +436,69 @@ impl Mijot {
         Some(self.volet_lecture(recette, cx).into_any_element())
     }
 
+    /// Nutrition d'une portion : Nutri-Score estimé et apports.
+    fn carte_nutrition(&self, recette: usize, cx: &App) -> Option<Div> {
+        let bilan = nutrition::bilan(&self.cat, recette)?;
+        let discret = cx.theme().muted_foreground;
+        let a = bilan.par_personne;
+        let note = match bilan.manquants {
+            0 => {
+                "Estimation d'après des valeurs moyennes, hors sel ajouté à la cuisson.".to_owned()
+            }
+            1 => "Estimation incomplète : un ingrédient n'a pas de valeurs connues.".to_owned(),
+            n => format!("Estimation incomplète : {n} ingrédients n'ont pas de valeurs connues."),
+        };
+        Some(
+            v_flex()
+                .gap_3()
+                .child(
+                    carte(cx)
+                        .p_3()
+                        .flex_row()
+                        .items_center()
+                        .gap_3()
+                        .child(echelle_score(bilan.score))
+                        .child(
+                            v_flex()
+                                .flex_1()
+                                .min_w_0()
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .font_weight(FontWeight::SEMIBOLD)
+                                        .child(format!("Nutri-Score {}", bilan.score.lettre())),
+                                )
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(discret)
+                                        .child("Estimé pour 100 g de plat"),
+                                ),
+                        ),
+                )
+                .child(
+                    h_flex()
+                        .gap_2()
+                        .items_stretch()
+                        .child(tuile("Calories", format!("{:.0}", a.kcal), cx))
+                        .child(tuile("Glucides", grammes(a.glucides), cx))
+                        .child(tuile("Protéines", grammes(a.proteines), cx))
+                        .child(tuile("Lipides", grammes(a.lipides), cx)),
+                )
+                .child(div().text_xs().text_color(discret).child(format!(
+                    "Dont sucres {} · graisses saturées {} · fibres {} · sel {}",
+                    grammes(a.sucres),
+                    grammes(a.satures),
+                    grammes(a.fibres),
+                    grammes(a.sel),
+                )))
+                .child(div().text_xs().text_color(discret).child(note)),
+        )
+    }
+
     fn volet_lecture(&self, recette: usize, cx: &mut Context<Self>) -> impl IntoElement {
         let bordure = cx.theme().border;
+        let nutrition = self.carte_nutrition(recette, cx);
         let r = &self.cat.recettes[recette];
         let id = r.id;
         let (icone, teinte) = visuel_categorie(r.categorie);
@@ -552,6 +619,11 @@ impl Mijot {
                             })),
                     ),
             )
+            .when_some(nutrition, |volet, nutrition| {
+                volet
+                    .child(titre_section("Nutrition · par personne", cx))
+                    .child(nutrition)
+            })
             .child(titre_section(
                 format!("Ingrédients · {}", pour.to_lowercase()),
                 cx,
