@@ -56,6 +56,9 @@ apk="$ici/gradle/app/build/outputs/apk/debug/app-debug.apk"
 echo "APK : $apk ($(du -h "$apk" | cut -f1))"
 
 if $installer; then
-    adb install -r "$apk"
-    adb shell am start -n app.mijot/dev.gpui.mobile.GpuiActivity
+    # L'adb du SDK : un adb plus ancien (paquet Debian) dans le PATH entre en
+    # conflit avec son serveur et fait échouer l'appairage sans fil.
+    adb="$sdk/platform-tools/adb"
+    "$adb" install -r "$apk"
+    "$adb" shell am start -n app.mijot/dev.gpui.mobile.GpuiActivity
 fi
