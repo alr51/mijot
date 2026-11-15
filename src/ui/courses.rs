@@ -15,7 +15,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use super::Mijot;
-use super::style::{carte, entete, pastille, visuel_rayon};
+use super::style::{carte, entete, haut_de_page, pastille, visuel_rayon};
 use crate::plan::{euros, liste_de_courses, quantite_lisible};
 
 impl Mijot {
@@ -33,9 +33,7 @@ impl Mijot {
         };
 
         let mut page = v_flex().max_w(px(760.)).gap_5().child(
-            h_flex()
-                .items_start()
-                .gap_3()
+            haut_de_page(self.compact)
                 .child(entete(
                     "Liste de courses",
                     format!("Pour {personnes} · total estimé {}", euros(total)),
@@ -131,15 +129,18 @@ impl Mijot {
                         .border_color(bordure)
                         .when(coche, |row| row.opacity(0.45))
                         .child(
-                            Checkbox::new(("ingredient", ligne.ingredient))
-                                .checked(coche)
-                                .label(i.nom.clone())
-                                .on_click(cx.listener(move |this, on: &bool, _, cx| {
-                                    this.cocher(id, *on, cx)
-                                })),
+                            div().flex_1().min_w_0().child(
+                                Checkbox::new(("ingredient", ligne.ingredient))
+                                    .checked(coche)
+                                    .label(i.nom.clone())
+                                    .on_click(cx.listener(move |this, on: &bool, _, cx| {
+                                        this.cocher(id, *on, cx)
+                                    })),
+                            ),
                         )
                         .child(
                             h_flex()
+                                .flex_shrink_0()
                                 .gap_4()
                                 .text_sm()
                                 .child(

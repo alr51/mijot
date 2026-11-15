@@ -18,7 +18,7 @@ use gpui_kit::*;
 
 use super::style::{
     carte, echelle_score, entete, entete_volet, etat_vide, numero, pastille, pastille_score,
-    titre_section, tuile, visuel_categorie, volet,
+    titre_section, tuile, tuiles, visuel_categorie, volet,
 };
 use super::{Liste, Mijot, ecrire_nombre, lire_nombre, liste, quantite_recette, selecteur};
 use crate::catalogue::{Catalogue, Recette};
@@ -416,7 +416,11 @@ impl Mijot {
                         Button::new("nouvelle-recette")
                             .primary()
                             .icon(IconName::Plus)
-                            .label("Nouvelle recette")
+                            .label(if self.compact {
+                                "Nouvelle"
+                            } else {
+                                "Nouvelle recette"
+                            })
                             .on_click(cx.listener(|this, _, window, cx| {
                                 this.ouvrir_editeur(None, window, cx)
                             })),
@@ -477,9 +481,7 @@ impl Mijot {
                         ),
                 )
                 .child(
-                    h_flex()
-                        .gap_2()
-                        .items_stretch()
+                    tuiles(self.compact)
                         .child(tuile("Calories", format!("{:.0}", a.kcal), cx))
                         .child(tuile("Glucides", grammes(a.glucides), cx))
                         .child(tuile("Protéines", grammes(a.proteines), cx))
@@ -548,7 +550,7 @@ impl Mijot {
             );
         }
 
-        volet("volet", 400., cx)
+        volet("volet", 400., self.compact, cx)
             .child(entete_volet(
                 pastille(icone, teinte, 48., cx),
                 r.nom.clone(),
@@ -582,9 +584,7 @@ impl Mijot {
                 )
             })
             .child(
-                h_flex()
-                    .gap_2()
-                    .items_stretch()
+                tuiles(self.compact)
                     .child(tuile(
                         format!("Pour {personnes}"),
                         format!("≈ {}", euros(par_personne * f64::from(personnes))),
@@ -710,6 +710,7 @@ impl Mijot {
         } else {
             h_flex()
                 .gap_2()
+                .flex_wrap()
                 .child(
                     Button::new("enregistrer-recette")
                         .primary()
@@ -749,7 +750,7 @@ impl Mijot {
             (IconName::Plus, "Nouvelle recette")
         };
 
-        volet("volet-edition", 460., cx)
+        volet("volet-edition", 460., self.compact, cx)
             .child(entete_volet(
                 pastille(icone, 16., 48., cx),
                 titre,

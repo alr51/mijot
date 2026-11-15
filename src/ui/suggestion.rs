@@ -270,7 +270,7 @@ impl Mijot {
         let par = i.unite.prix_par();
         let (icone, teinte) = visuel_rayon(i.rayon);
 
-        let mut panneau = volet("volet-suggestion", 420., cx)
+        let mut panneau = volet("volet-suggestion", 420., self.compact, cx)
             .child(entete_volet(
                 pastille(icone, teinte, 48., cx),
                 i.nom.clone(),

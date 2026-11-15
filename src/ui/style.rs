@@ -328,6 +328,9 @@ pub(super) fn entete(
     v_flex()
         .flex_1()
         .min_w_0()
+        // Sous son titre dans une colonne (format téléphone), l'en-tête garde
+        // sa hauteur.
+        .flex_shrink_0()
         .gap_1()
         .child(
             div()
@@ -377,8 +380,13 @@ pub(super) fn etat_vide(
         )
 }
 
-/// Volet de droite : feuille défilante, à côté de celle du contenu.
-pub(super) fn volet(id: &'static str, largeur: f32, cx: &App) -> Stateful<Div> {
+/// Volet : feuille défilante de `largeur` pixels, à droite de celle du contenu.
+/// Au format téléphone (`compact`), il prend la place de la page, qui défile
+/// déjà : ni feuille ni largeur fixe.
+pub(super) fn volet(id: &'static str, largeur: f32, compact: bool, cx: &App) -> Stateful<Div> {
+    if compact {
+        return v_flex().id(id).gap_4();
+    }
     feuille(cx)
         .id(id)
         .w(px(largeur))
@@ -386,6 +394,25 @@ pub(super) fn volet(id: &'static str, largeur: f32, cx: &App) -> Stateful<Div> {
         .overflow_y_scroll()
         .p_5()
         .gap_4()
+}
+
+/// Haut de page : le titre et, à sa droite, les actions de la page. Au format
+/// téléphone, les actions passent sous le titre.
+pub(super) fn haut_de_page(compact: bool) -> Div {
+    if compact {
+        v_flex().gap_3()
+    } else {
+        h_flex().items_start().gap_3()
+    }
+}
+
+/// Rangée de tuiles de même largeur ; deux par ligne au format téléphone.
+pub(super) fn tuiles(compact: bool) -> Div {
+    if compact {
+        div().grid().grid_cols(2).gap_2()
+    } else {
+        h_flex().gap_2().items_stretch()
+    }
 }
 
 /// En-tête d'un volet : pastille, titre, précision, bouton de fermeture.

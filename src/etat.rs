@@ -127,9 +127,12 @@ impl Etat {
     }
 }
 
-/// Dossier de données : `~/.local/share/mijot` sous Linux.
+/// Dossier de données : celui de l'hôte s'il en fournit un (Android), sinon
+/// `~/.local/share/mijot` sous Linux.
 pub fn dossier() -> Option<PathBuf> {
-    directories::ProjectDirs::from("", "", "mijot").map(|d| d.data_dir().to_path_buf())
+    crate::hote::dossier().or_else(|| {
+        directories::ProjectDirs::from("", "", "mijot").map(|d| d.data_dir().to_path_buf())
+    })
 }
 
 fn fichier() -> Option<PathBuf> {

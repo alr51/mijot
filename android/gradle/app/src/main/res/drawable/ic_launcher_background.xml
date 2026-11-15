@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dégradé du logo : orange chaud vers l'accent terracotta. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <gradient
+        android:angle="315"
+        android:startColor="@color/mijot_orange"
+        android:endColor="@color/mijot_accent" />
+</shape>

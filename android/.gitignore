@@ -1,0 +1,6 @@
+# Produits de Gradle et bibliothèque Rust déposée par build.sh.
+gradle/.gradle/
+gradle/build/
+gradle/app/build/
+gradle/app/src/main/jniLibs/
+gradle/local.properties

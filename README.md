@@ -1,7 +1,7 @@
 # Mijot
 
 Menus de la semaine à budget donné et liste de courses, en application de bureau
-(Rust, [GPUI Kit](https://gpui-kit.com)). Les données restent sur la machine ; le
+et Android (Rust, [GPUI Kit](https://gpui-kit.com), [gpui-mobile](https://github.com/itsbalamurali/gpui-mobile)). Les données restent sur la machine ; le
 réseau ne sert qu'à suggérer un prix, sur demande.
 
 - **Menu de la semaine** : budget, nombre de personnes et de repas (1 à 14), option
@@ -28,14 +28,41 @@ cargo run --release
 La première compilation est longue (GPUI). Le toolchain est fixé par
 `rust-toolchain.toml`.
 
+Sous 720 px de large, l'interface passe au format téléphone : onglets en bas,
+une seule colonne, fiche de recette en plein écran (Échap ou « retour » la ferme).
+
 ```sh
 cargo test    # catalogue SQLite, planificateur, liste de courses, état, lecture des relevés (sans réseau)
 ```
+
+## Android
+
+```sh
+android/build.sh --installer              # téléphone branché (arm64), via adb
+android/build.sh --emulateur --installer  # émulateur x86_64
+```
+
+Prérequis : SDK Android (plateforme 36) et NDK, `cargo install cargo-ndk`, un JDK 17
+ou plus récent. Le script compile la bibliothèque Rust (`android/`), la dépose dans
+le projet Gradle (`android/gradle/`) et produit un APK de mise au point.
+
+- `android/src/lib.rs` : point d'entrée (`android_main`), dossier de données de
+  l'application, marges des barres système.
+- `android/vendor/gpui-mobile/` : copie de gpui-mobile adaptée à la version de GPUI
+  de GPUI Kit ; les raisons et les modifications sont dans `android/vendor/LISEZMOI.md`.
+- `android/gradle/app/src/main/java/dev/gpui/mobile/` : classes Java hôtes de
+  gpui-mobile, reprises de son exemple.
+
+Essayé sur l'émulateur (Android 16) uniquement. iOS n'est pas pris en charge : il
+faudrait un Mac pour compiler et adapter la partie iOS de gpui-mobile.
 
 ## Organisation
 
 | Fichier               | Rôle                                                                |
 | --------------------- | ------------------------------------------------------------------- |
+| `src/lib.rs`          | Ouverture des données et de la fenêtre, communes aux lanceurs       |
+| `src/main.rs`         | Lanceur de bureau                                                   |
+| `src/hote.rs`         | Ce que fournit l'hôte mobile : dossier de données, marges           |
 | `src/donnees.rs`      | Catalogue de départ, copié dans la base à sa création               |
 | `src/catalogue.rs`    | Catalogue modifiable : schéma SQLite, lecture, écritures validées   |
 | `src/plan.rs`         | Coûts, composition d'un menu dans le budget, liste de courses       |
@@ -52,7 +79,8 @@ cargo test    # catalogue SQLite, planificateur, liste de courses, état, lectur
 
 ## Données
 
-Tout est dans `~/.local/share/mijot/` :
+Tout est dans `~/.local/share/mijot/` (sur Android, dans le dossier privé de
+l'application) :
 
 - `mijot.db` (SQLite) : tables `ingredient`, `recette`, `recette_ingredient`, `etape`.
   La base est créée et remplie au premier lancement ; ensuite le catalogue de départ

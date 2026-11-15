@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fond de l'application (thème clair) : écran de démarrage et barres système. -->
+    <color name="gpui_surface">#FFFFFFFF</color>
+    <!-- Accent terracotta et orange du logo (voir src/ui/style.rs). -->
+    <color name="mijot_accent">#FFED5A1C</color>
+    <color name="mijot_orange">#FFF99B2F</color>
+</resources>

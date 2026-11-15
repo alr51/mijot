@@ -47,6 +47,19 @@ const ONGLETS: [Onglet; 4] = [
     Onglet::Prix,
 ];
 
+impl Onglet {
+    /// Pictogramme, libellé de la barre latérale et libellé court de la barre
+    /// d'onglets du format téléphone.
+    fn visuel(self) -> (IconName, &'static str, &'static str) {
+        match self {
+            Onglet::Menu => (IconName::CalendarDays, "Cette semaine", "Semaine"),
+            Onglet::Courses => (IconName::ShoppingCart, "Liste de courses", "Courses"),
+            Onglet::Recettes => (IconName::BookOpen, "Recettes", "Recettes"),
+            Onglet::Prix => (IconName::Coins, "Ingrédients et prix", "Prix"),
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 enum Compteur {
     Personnes,
@@ -58,6 +71,13 @@ const LARGEUR_NAVIGATION: f32 = 232.;
 
 /// Marge intérieure horizontale de la feuille du contenu, en pixels.
 const MARGE_FEUILLE: f32 = 36.;
+
+/// Largeur de fenêtre, en pixels, sous laquelle l'interface passe au format
+/// téléphone : onglets en bas, une seule colonne, volets en plein écran.
+const SEUIL_COMPACT: f32 = 720.;
+
+/// Marge intérieure horizontale du contenu au format téléphone, en pixels.
+const MARGE_COMPACTE: f32 = 16.;
 
 const JOURS: [&str; 7] = [
     "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche",
@@ -157,6 +177,11 @@ pub struct Mijot {
     cat: Catalogue,
     etat: Etat,
     onglet: Onglet,
+    /// Format téléphone : relevé à chaque rendu d'après la largeur de la fenêtre.
+    compact: bool,
+    /// Foyer de la fenêtre quand aucun champ ne l'a : il reçoit la touche
+    /// Échap, qui est aussi le bouton « retour » d'Android.
+    foyer: FocusHandle,
     budget: Entity<InputState>,
     filtre: Entity<InputState>,
     extra: Entity<InputState>,
@@ -216,6 +241,8 @@ impl Mijot {
             cat,
             etat,
             onglet: Onglet::Menu,
+            compact: false,
+            foyer: cx.focus_handle(),
             budget,
             filtre,
             extra,
@@ -234,7 +261,23 @@ impl Mijot {
         if let Some(alerte) = alerte {
             mijot.avis = Some((false, alerte));
         }
+        mijot.foyer.focus(window, cx);
         mijot
+    }
+
+    /// Échap, ou « retour » sur Android : ferme le volet ouvert, s'il y en a un.
+    fn retour(&mut self, cx: &mut Context<Self>) -> bool {
+        let ferme = match self.onglet {
+            Onglet::Menu | Onglet::Recettes => {
+                self.editeur.take().is_some() || self.detail.take().is_some()
+            }
+            Onglet::Prix => self.suggestion.take().is_some(),
+            Onglet::Courses => false,
+        };
+        if ferme {
+            cx.notify();
+        }
+        ferme
     }
 
     // --- Actions -------------------------------------------------------------
@@ -533,12 +576,8 @@ impl Mijot {
                     ),
             );
         for (position, onglet) in ONGLETS.into_iter().enumerate() {
-            let (icone, libelle, compte) = match onglet {
-                Onglet::Menu => (IconName::CalendarDays, "Cette semaine", None),
-                Onglet::Courses => (IconName::ShoppingCart, "Liste de courses", Some(restants)),
-                Onglet::Recettes => (IconName::BookOpen, "Recettes", None),
-                Onglet::Prix => (IconName::Coins, "Ingrédients et prix", None),
-            };
+            let (icone, libelle, _) = onglet.visuel();
+            let compte = (onglet == Onglet::Courses).then_some(restants);
             barre = barre.child(
                 Self::entree_navigation(
                     ("page", position),
@@ -585,6 +624,112 @@ impl Mijot {
         )
     }
 
+    /// Barre d'onglets du format téléphone, en bas de l'écran. `bas` : hauteur
+    /// de la barre de navigation du système, à laisser libre dessous.
+    fn barre_onglets(&self, bas: f32, cx: &mut Context<Self>) -> Div {
+        let theme = cx.theme();
+        let (discret, primaire, bordure, fond) = (
+            theme.muted_foreground,
+            theme.primary,
+            theme.border,
+            theme.sidebar,
+        );
+        let restants = self.articles_restants();
+        let mut barre = h_flex()
+            .flex_shrink_0()
+            .pb(px(bas))
+            .border_t_1()
+            .border_color(bordure)
+            .bg(fond);
+        for (position, onglet) in ONGLETS.into_iter().enumerate() {
+            let (icone, _, libelle) = onglet.visuel();
+            let active = self.onglet == onglet;
+            let compte = (onglet == Onglet::Courses)
+                .then_some(restants)
+                .filter(|n| *n > 0);
+            barre = barre.child(
+                v_flex()
+                    .id(("onglet", position))
+                    .flex_1()
+                    .min_w_0()
+                    .items_center()
+                    .gap_1()
+                    .pt_2p5()
+                    .pb_2()
+                    .text_xs()
+                    .text_color(if active { primaire } else { discret })
+                    .when(active, |onglet| onglet.font_weight(FontWeight::SEMIBOLD))
+                    .child(
+                        h_flex()
+                            .gap_1()
+                            .child(Icon::new(icone).with_size(Size::Size(px(22.))))
+                            .children(compte.map(|n| {
+                                div()
+                                    .px_1p5()
+                                    .rounded_full()
+                                    .bg(primaire.opacity(0.14))
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(primaire)
+                                    .child(n.to_string())
+                            })),
+                    )
+                    .child(libelle)
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.onglet = onglet;
+                        this.avis = None;
+                        cx.notify();
+                    })),
+            );
+        }
+        barre
+    }
+
+    /// Format téléphone : la page en pleine largeur et les onglets en bas. Un
+    /// volet ouvert prend la place de la page ; sa croix y ramène.
+    fn rendu_compact(
+        &self,
+        page: Div,
+        volet: Option<AnyElement>,
+        avis: Option<Alert>,
+        cx: &mut Context<Self>,
+    ) -> Div {
+        let marges = crate::hote::marges();
+        let theme = cx.theme();
+        let plein_ecran = volet.is_some();
+        v_flex()
+            .size_full()
+            .pt(px(marges.haut))
+            .bg(theme.background)
+            .text_color(theme.foreground)
+            .child(
+                v_flex()
+                    .id(if plein_ecran {
+                        "volet-compact"
+                    } else {
+                        "contenu"
+                    })
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .px(px(MARGE_COMPACTE))
+                    .pt_4()
+                    .pb_6()
+                    .gap_4()
+                    .children(avis)
+                    .map(|contenu| match volet {
+                        Some(volet) => contenu.child(volet),
+                        None => contenu.child(page),
+                    }),
+            )
+            .map(|ecran| {
+                if plein_ecran {
+                    ecran.pb(px(marges.bas))
+                } else {
+                    ecran.child(self.barre_onglets(marges.bas, cx))
+                }
+            })
+    }
+
     fn etiquettes(&self, recette: usize) -> Div {
         let r = &self.cat.recettes[recette];
         h_flex()
@@ -613,6 +758,8 @@ impl Render for Mijot {
         if !style::palette_en_place(cx) {
             cx.defer(appliquer_palette);
         }
+        let largeur = f32::from(window.viewport_size().width);
+        self.compact = largeur < SEUIL_COMPACT;
         // Volet de droite : la recette ouverte ou en cours de modification à côté
         // du menu et des recettes, la suggestion de prix à côté des prix.
         let volet = match self.onglet {
@@ -629,11 +776,11 @@ impl Render for Mijot {
         } else {
             408.
         };
-        let utile = f32::from(window.viewport_size().width)
-            - LARGEUR_NAVIGATION
-            - largeur_volet
-            - 2. * MARGE_FEUILLE
-            - 8.;
+        let utile = if self.compact {
+            largeur - 2. * MARGE_COMPACTE
+        } else {
+            largeur - LARGEUR_NAVIGATION - largeur_volet - 2. * MARGE_FEUILLE - 8.
+        };
         let colonnes = (((utile + 16.) / 276.) as u16).clamp(1, 4);
         let page = match self.onglet {
             Onglet::Menu => self.page_menu(colonnes, cx),
@@ -648,6 +795,30 @@ impl Render for Mijot {
                 Alert::warning("avis", texte.clone())
             }
         });
+        let ecran = if self.compact {
+            self.rendu_compact(page, volet, avis, cx)
+        } else {
+            self.rendu_large(page, volet, avis, cx)
+        };
+        ecran.track_focus(&self.foyer).on_key_down(cx.listener(
+            |this, touche: &KeyDownEvent, _, cx| {
+                if touche.keystroke.key == "escape" && this.retour(cx) {
+                    cx.stop_propagation();
+                }
+            },
+        ))
+    }
+}
+
+impl Mijot {
+    /// Format de bureau : barre latérale, feuille du contenu et volet à droite.
+    fn rendu_large(
+        &self,
+        page: Div,
+        volet: Option<AnyElement>,
+        avis: Option<Alert>,
+        cx: &mut Context<Self>,
+    ) -> Div {
         let theme = cx.theme();
         // Le fond de la fenêtre est celui de la barre latérale ; le contenu et
         // le volet y sont posés comme deux feuilles flottantes.

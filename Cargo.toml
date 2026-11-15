@@ -6,6 +6,12 @@ rust-version = "1.98"
 publish = false
 description = "Menus de la semaine à budget donné et liste de courses (GPUI Kit, 100 % local)"
 
+# La bibliothèque porte toute l'application ; `src/main.rs` est le lanceur de
+# bureau, `android/` le lanceur Android (gpui-mobile).
+[workspace]
+members = [".", "android", "android/vendor/gpui-mobile"]
+default-members = ["."]
+
 [dependencies]
 # GPUI Kit embarque GPUI : version exacte, ne jamais ajouter `gpui` séparément.
 gpui-kit = "=0.9.1"
@@ -23,3 +29,9 @@ strip = "debuginfo"
 [profile.dev.package."*"]
 # Les dépendances (GPUI) compilées optimisées : l'UI reste fluide en debug.
 opt-level = 2
+
+[profile.dev.package.wgpu-types]
+# wgpu décide ici de son mode de débogage (couches de validation, étiquettes
+# d'objets). Désactivé : le pilote Vulkan de l'émulateur Android plante sur ces
+# étiquettes, et l'application ne s'en sert pas.
+debug-assertions = false

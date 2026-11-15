@@ -13,8 +13,8 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use super::style::{
-    bandeau, carte, degrade, entete, etat_vide, jauge, ombre, pastille_score, pilule, trait_teinte,
-    tuile, visuel_categorie,
+    bandeau, carte, degrade, entete, etat_vide, haut_de_page, jauge, ombre, pastille_score, pilule,
+    trait_teinte, tuile, tuiles, visuel_categorie,
 };
 use super::{Compteur, Mijot, libelle_repas};
 use crate::nutrition;
@@ -130,7 +130,7 @@ impl Mijot {
                 .child(
                     v_flex()
                         .flex_1()
-                        .min_w(px(280.))
+                        .min_w(px(if self.compact { 0. } else { 280. }))
                         .gap_3()
                         .child(
                             h_flex()
@@ -171,10 +171,9 @@ impl Mijot {
                         .child(jauge(part, couleur, cx)),
                 )
                 .child(
-                    h_flex()
+                    tuiles(self.compact)
                         .w(px(440.))
                         .max_w_full()
-                        .gap_2()
                         .child(tuile(libelle_ecart, ecart, cx))
                         .child(tuile("Par assiette", euros(cout / portions), cx))
                         .child(tuile(
@@ -356,9 +355,7 @@ impl Mijot {
         let mut page = v_flex()
             .gap_5()
             .child(
-                h_flex()
-                    .items_start()
-                    .gap_3()
+                haut_de_page(self.compact)
                     .child(entete("Cette semaine", sous_titre, cx))
                     .child(
                         Button::new("generer")

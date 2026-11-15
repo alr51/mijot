@@ -1,0 +1,25 @@
+[package]
+name = "mijot-android"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98"
+publish = false
+description = "Lanceur Android de Mijot (gpui-mobile)"
+
+[lib]
+name = "mijot_android"
+crate-type = ["cdylib"]
+
+[target.'cfg(target_os = "android")'.dependencies]
+mijot = { path = ".." }
+# Copie corrigée pour gpui-pre 0.3.12 : voir vendor/LISEZMOI.md.
+gpui-mobile = { path = "vendor/gpui-mobile", default-features = false, features = ["clipboard"] }
+android-activity = { version = "0.6", features = ["native-activity"] }
+android_logger = "0.15"
+jni = "0.22"
+libc = "0.2"
+log = "0.4"
+# En compilation de mise au point, rust-embed lit les fichiers sur le disque de
+# la machine de compilation au lieu de les embarquer : sur le téléphone, les
+# pictogrammes de GPUI Kit seraient introuvables.
+rust-embed = { version = "8", features = ["debug-embed"] }

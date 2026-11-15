@@ -11,6 +11,7 @@ use gpui_kit::component::{
     select::{Select, SelectEvent, SelectState},
     v_flex,
 };
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use super::style::{carte, entete, pastille, visuel_rayon};
@@ -308,14 +309,20 @@ impl Mijot {
                         }))
                         .into_any_element()
                 };
+                // Au format téléphone, deux lignes : le nom et son usage, puis
+                // les commandes. Un séparateur de pleine largeur force le retour.
                 section = section.child(
                     h_flex()
-                        .gap_3()
+                        .gap_x_3()
                         .py_1()
                         .border_t_1()
                         .border_color(bordure)
+                        .when(self.compact, |ligne| ligne.flex_wrap())
                         .child(div().flex_1().min_w_0().child(i.nom.clone()))
                         .child(usage)
+                        .when(self.compact, |ligne| {
+                            ligne.child(div().w_full()).child(div().flex_1())
+                        })
                         .child(
                             Button::new(("suggerer-prix", position))
                                 .small()
